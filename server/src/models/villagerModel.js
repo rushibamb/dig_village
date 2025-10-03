@@ -29,7 +29,6 @@ const villagerSchema = mongoose.Schema(
     },
     idProofPhoto: {
       type: String,
-      required: [true, 'Please upload ID proof photo'],
       trim: true
     },
     address: {

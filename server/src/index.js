@@ -15,6 +15,7 @@ const User = require('./models/userModel');
 const authRoutes = require('./routes/authRoutes');
 const villagerRoutes = require('./routes/villagerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const grievanceRoutes = require('./routes/grievanceRoutes');
 
 // Create default admin user
 const createDefaultAdmin = async () => {
@@ -86,7 +87,8 @@ const app = express();
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '50mb', extended: true }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
 // Routes
 app.get('/', (req, res) => {
@@ -101,6 +103,10 @@ app.use('/api/villagers', villagerRoutes);
 
 // Admin routes
 app.use('/api/admin', adminRoutes);
+
+// Grievance routes
+app.use('/api/grievances', grievanceRoutes);
+
 
 // Start server
 const PORT = process.env.PORT || 5000;
