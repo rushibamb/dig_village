@@ -16,6 +16,9 @@ const authRoutes = require('./routes/authRoutes');
 const villagerRoutes = require('./routes/villagerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const grievanceRoutes = require('./routes/grievanceRoutes');
+const newsPublicRoutes = require('./routes/newsPublicRoutes');
+const weatherPublicRoutes = require('./routes/weatherPublicRoutes');
+const committeePublicRoutes = require('./routes/committeePublicRoutes');
 
 // Create default admin user
 const createDefaultAdmin = async () => {
@@ -106,6 +109,15 @@ app.use('/api/admin', adminRoutes);
 
 // Grievance routes
 app.use('/api/grievances', grievanceRoutes);
+
+// Public news routes
+app.use('/api/news', newsPublicRoutes);
+
+// Public weather routes
+app.use('/api/weather', weatherPublicRoutes);
+
+// Public committee routes
+app.use('/api/committee', committeePublicRoutes);
 
 
 // Start server
