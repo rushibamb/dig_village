@@ -5,7 +5,7 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
@@ -23,9 +23,42 @@ import {
   adminUpdateVillager,
   adminExportCsv
 } from '../services/villagerService';
+import {
+  adminGetAllGrievances,
+  getAllWorkers,
+  addWorker,
+  updateWorker,
+  deleteWorker,
+  adminUpdateGrievanceAdminStatus,
+  adminAssignWorkerToGrievance,
+  adminUpdateGrievanceProgressStatus,
+  adminUpdateGrievanceProgress
+} from '../services/grievanceService';
+import {
+  adminGetAllNewsArticles,
+  adminGetAllCategories,
+  adminGetAllEvents,
+  adminGetNewsStats,
+  adminCreateNewsArticle,
+  adminUpdateNewsArticle,
+  adminDeleteNewsArticle,
+  adminCreateCategory,
+  adminUpdateCategory,
+  adminDeleteCategory,
+  adminCreateEvent,
+  adminUpdateEvent,
+  adminDeleteEvent,
+  adminGetAllWeatherAlerts,
+  adminCreateWeatherAlert,
+  adminUpdateWeatherAlert,
+  adminDeleteWeatherAlert,
+  adminGetWeatherAlertStats
+} from '../services/newsService';
+
 import { formatDateForAPI } from '../utils/dateUtils';
 import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
+import { ImageWithFallback } from './figma/ImageWithFallback';
 import { 
   Plus,
   Edit,
@@ -97,6 +130,28 @@ export function AdminPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVillager, setEditingVillager] = useState(null);
 
+  // Grievance management states
+  const [grievances, setGrievances] = useState([]);
+  const [workers, setWorkers] = useState([]);
+  const [grievanceLoading, setGrievanceLoading] = useState(true);
+
+  // Worker management states
+  const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false);
+  const [editingWorker, setEditingWorker] = useState(null); // Will hold worker data for editing
+  const [workerFormData, setWorkerFormData] = useState({ 
+    name: '', 
+    department: '', 
+    phone: '', 
+    email: '',
+    status: 'active'
+  });
+
+  // Grievance detail modal states
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedGrievance, setSelectedGrievance] = useState(null);
+  const [resolutionPhotos, setResolutionPhotos] = useState([]);
+
+
   // Summary stats for villager cards
   const getVillagerStats = () => {
     return {
@@ -138,6 +193,84 @@ export function AdminPage() {
     fetchVillagers();
   }, [searchTerm, statusFilter]);
 
+  // Reusable function to fetch grievances
+  const fetchGrievances = async () => {
+    try {
+      setGrievanceLoading(true);
+      const grievanceRes = await adminGetAllGrievances();
+      setGrievances(grievanceRes.data);
+    } catch (error) {
+      console.error("Failed to fetch grievances:", error);
+    } finally {
+      setGrievanceLoading(false);
+    }
+  };
+  
+  // Reusable function to fetch workers
+  const fetchWorkers = async () => {
+    try {
+      const workerRes = await getAllWorkers();
+      setWorkers(workerRes.data);
+    } catch (error) {
+      console.error("Failed to fetch workers:", error);
+    }
+  };
+
+  // Reusable function to fetch news data
+  const fetchNewsData = async () => {
+    try {
+      const [newsRes, statsRes] = await Promise.all([
+        adminGetAllNewsArticles(),
+        adminGetNewsStats()
+      ]);
+      
+      setNewsItems(newsRes.data);
+      setNewsStats(statsRes.data);
+    } catch (error) {
+      console.error("Failed to fetch news data:", error);
+      toast.error("Failed to load news data");
+    }
+  };
+
+  // Reusable function to fetch categories
+  const fetchCategories = async () => {
+    try {
+      const categoriesRes = await adminGetAllCategories();
+      console.log("Categories response:", categoriesRes);
+      setNewsCategories(categoriesRes.data || categoriesRes || []);
+    } catch (error) {
+      console.error("Failed to fetch categories:", error);
+      toast.error("Failed to load categories");
+    }
+  };
+
+  // Reusable function to fetch events
+  const fetchEvents = async () => {
+    try {
+      const eventsRes = await adminGetAllEvents();
+      setUpcomingEvents(eventsRes.data);
+    } catch (error) {
+      console.error("Failed to fetch events:", error);
+      toast.error("Failed to load events");
+    }
+  };
+
+
+  // Fetch grievance, worker, and news data on component mount
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      await Promise.all([
+        fetchGrievances(), 
+        fetchWorkers(), 
+        fetchNewsData(),
+        fetchCategories(),
+        fetchEvents(),
+        fetchWeatherAlerts()
+      ]);
+    };
+    fetchInitialData();
+  }, []);
+
   // Handler functions
   const handleApprove = async (id) => {
     try {
@@ -162,6 +295,313 @@ export function AdminPage() {
     } catch (error) {
       console.error('Error rejecting villager:', error);
       toast.error(t({ en: 'Failed to reject villager', mr: 'गावकरी नाकारण्यात अयशस्वी' }));
+    }
+  };
+
+  // Worker management handler functions
+  const handleOpenWorkerModal = () => {
+    setIsWorkerModalOpen(true);
+  };
+
+  const handleEditWorkerClick = (worker) => {
+    setEditingWorker(worker);
+    setWorkerFormData({
+      name: worker.name || '',
+      department: worker.department || '',
+      phone: worker.phone || '',
+      email: worker.email || '',
+      status: worker.status || 'active'
+    });
+    setIsWorkerModalOpen(true);
+  };
+
+  const handleAddNewWorkerClick = () => {
+    setEditingWorker(null);
+    setWorkerFormData({
+      name: '',
+      department: '',
+      phone: '',
+      email: '',
+      status: 'active'
+    });
+    setIsWorkerModalOpen(true);
+  };
+
+  const handleDeleteWorker = async (workerId) => {
+    if (window.confirm(t({ 
+      en: 'Are you sure you want to delete this worker?', 
+      mr: 'तुम्ही या कामगाराला हटवू इच्छिता का?' 
+    }))) {
+      try {
+        const response = await deleteWorker(workerId);
+        if (response.success) {
+          toast.success(t({ 
+            en: 'Worker deleted successfully', 
+            mr: 'कामगार यशस्वीरित्या हटवला' 
+          }));
+          await fetchWorkers(); // Refresh the list
+        }
+      } catch (error) {
+        console.error('Error deleting worker:', error);
+        toast.error(t({ 
+          en: 'Failed to delete worker', 
+          mr: 'कामगार हटवण्यात अयशस्वी' 
+        }));
+      }
+    }
+  };
+
+  const handleWorkerFormChange = (e) => {
+    const { name, value } = e.target;
+    setWorkerFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleWorkerFormSubmit = async (e) => {
+    e.preventDefault();
+    
+    if (!workerFormData.name || !workerFormData.department) {
+      toast.error(t({ 
+        en: 'Please fill in name and department', 
+        mr: 'कृपया नाव आणि विभाग भरा' 
+      }));
+      return;
+    }
+
+    try {
+      let response;
+      if (editingWorker) {
+        response = await updateWorker(editingWorker._id, workerFormData);
+      } else {
+        response = await addWorker(workerFormData);
+      }
+
+      if (response.success) {
+        toast.success(t({ 
+          en: editingWorker ? 'Worker updated successfully' : 'Worker added successfully',
+          mr: editingWorker ? 'कामगार यशस्वीरित्या अद्यतनित केला' : 'कामगार यशस्वीरित्या जोडला'
+        }));
+        
+        await fetchWorkers(); // Refresh the list
+        setIsWorkerModalOpen(false); // Close modal
+        setEditingWorker(null); // Reset editing state
+        setWorkerFormData({ name: '', department: '', phone: '', email: '', status: 'active' }); // Reset form
+      }
+    } catch (error) {
+      console.error('Error saving worker:', error);
+      toast.error(t({ 
+        en: editingWorker ? 'Failed to update worker' : 'Failed to add worker',
+        mr: editingWorker ? 'कामगार अद्यतनित करण्यात अयशस्वी' : 'कामगार जोडण्यात अयशस्वी'
+      }));
+    }
+  };
+
+
+  // Grievance action handler functions
+  const handleOpenDetailModal = (grievance) => {
+    console.log('Opening detail modal with grievance:', grievance);
+    setSelectedGrievance(grievance);
+    setIsDetailModalOpen(true);
+  };
+
+  const handleUpdateAdminStatus = async (grievanceId, status) => {
+    try {
+      const response = await adminUpdateGrievanceAdminStatus(grievanceId, status);
+      if (response.success) {
+        toast.success(t({ 
+          en: `Grievance ${status.toLowerCase()} successfully`, 
+          mr: `तक्रार ${status.toLowerCase()} यशस्वीरित्या ${status === 'Approved' ? 'मंजूर' : 'नाकारली'}` 
+        }));
+        await fetchGrievances(); // Refresh the grievances list
+        // Update the selectedGrievance if it's the same grievance
+        if (selectedGrievance && selectedGrievance._id === grievanceId) {
+          setSelectedGrievance(prev => ({
+            ...prev,
+            adminStatus: status
+          }));
+        }
+      }
+    } catch (error) {
+      console.error('Error updating grievance admin status:', error);
+      toast.error(t({ 
+        en: `Failed to ${status.toLowerCase()} grievance`, 
+        mr: `तक्रार ${status.toLowerCase()} करण्यात अयशस्वी` 
+      }));
+    }
+  };
+
+  const handleAssignWorker = async (workerId) => {
+    if (!selectedGrievance) {
+      toast.error(t({ 
+        en: 'No grievance selected', 
+        mr: 'कोणतीही तक्रार निवडलेली नाही' 
+      }));
+      return;
+    }
+
+    try {
+      // Handle unassignment case
+      const actualWorkerId = workerId === 'unassigned' ? null : workerId;
+      
+      const response = await adminAssignWorkerToGrievance(selectedGrievance._id, actualWorkerId);
+      if (response.success) {
+        const assignedWorker = actualWorkerId ? workers.find(w => w._id === actualWorkerId) : null;
+        
+        toast.success(t({ 
+          en: actualWorkerId ? 'Worker assigned successfully' : 'Worker unassigned successfully',
+          mr: actualWorkerId ? 'कामगार यशस्वीरित्या नियुक्त केला' : 'कामगार नियुक्तता रद्द केली'
+        }));
+        await fetchGrievances(); // Refresh the grievances list
+        // Update the selectedGrievance locally
+        setSelectedGrievance(prev => ({
+          ...prev,
+          assignedWorker: assignedWorker
+        }));
+      }
+    } catch (error) {
+      console.error('Error assigning worker:', error);
+      toast.error(t({ 
+        en: 'Failed to assign worker', 
+        mr: 'कामगार नियुक्त करण्यात अयशस्वी' 
+      }));
+    }
+  };
+
+  const handleUpdateProgress = async (newStatus) => {
+    if (!selectedGrievance) {
+      toast.error(t({ 
+        en: 'No grievance selected', 
+        mr: 'कोणतीही तक्रार निवडलेली नाही' 
+      }));
+      return;
+    }
+
+    try {
+      const response = await adminUpdateGrievanceProgressStatus(selectedGrievance._id, newStatus);
+      if (response.success) {
+        toast.success(t({ 
+          en: 'Grievance status updated successfully', 
+          mr: 'तक्रार स्थिती यशस्वीरित्या अद्यतनित केली' 
+        }));
+        await fetchGrievances(); // Refresh the grievances list
+        // Update the selectedGrievance locally
+        setSelectedGrievance(prev => ({
+          ...prev,
+          progressStatus: newStatus
+        }));
+      }
+    } catch (error) {
+      console.error('Error updating grievance progress:', error);
+      toast.error(t({ 
+        en: 'Failed to update grievance status', 
+        mr: 'तक्रार स्थिती अद्यतनित करण्यात अयशस्वी' 
+      }));
+    }
+  };
+
+  // Image compression function
+  const compressImage = (file, maxWidth = 1200, quality = 0.8) => {
+    return new Promise((resolve, reject) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      
+      img.onload = () => {
+        // Calculate new dimensions while maintaining aspect ratio
+        let { width, height } = img;
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        
+        // Draw and compress
+        ctx?.drawImage(img, 0, 0, width, height);
+        canvas.toBlob(resolve, file.type, quality);
+      };
+      
+      img.onerror = reject;
+      img.src = URL.createObjectURL(file);
+    });
+  };
+
+  // Handle resolution Photo upload (Development version)
+  const handleResolutionUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error(t({ 
+        en: 'Please select only image files', 
+        mr: 'कृपया फक्त फोटो निवडा' 
+      }));
+      return;
+    }
+
+    try {
+      // Compress image if it's too large (> 1MB)
+      let processedFile = file;
+      if (file.size > 1024 * 1024) { // 1MB
+        processedFile = await compressImage(file);
+      }
+
+      // Convert file to base64 data URL for persistent storage
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setResolutionPhotos(prev => [...prev, e.target?.result]);
+        toast.success(t({ 
+          en: 'Resolution photo uploaded successfully', 
+          mr: 'निराकरण फोटो यशस्वीरित्या अपलोड केला' 
+        }));
+      };
+      reader.onerror = () => {
+        console.error('Error reading resolution photo');
+        toast.error(t({ 
+          en: 'Failed to upload resolution photo', 
+          mr: 'निराकरण फोटो अपलोड करणे अयशस्वी' 
+        }));
+      };
+      reader.readAsDataURL(processedFile);
+    } catch (error) {
+      console.error('Error uploading resolution photo:', error);
+      toast.error(t({ 
+        en: 'Please select only image files', 
+        mr: 'कृपया फक्त फोटो निवडा' 
+      }));
+    }
+  };
+
+  // Handle marking grievance as resolved with photos
+  const handleMarkAsResolved = async () => {
+    if (!selectedGrievance || resolutionPhotos.length === 0) {
+      toast.error(t({ 
+        en: 'Please upload resolution photos before marking as resolved', 
+        mr: 'निराकरण केलेला चिन्हांकित करण्यापूर्वी कृपया निराकरण फोटो अपलोड करा' 
+      }));
+      return;
+    }
+
+    try {
+      const response = await adminUpdateGrievanceProgress(selectedGrievance._id, 'Resolved', resolutionPhotos);
+      if (response.success) {
+        toast.success(t({ 
+          en: 'Grievance marked as resolved with photos', 
+          mr: 'फोटोसह तक्रारीचे निराकरण केले' 
+        }));
+        await fetchGrievances(); // Refresh the grievances list
+        setResolutionPhotos([]); // Clear photos
+        setIsDetailModalOpen(false); // Close modal
+      }
+    } catch (error) {
+      console.error('Error marking grievance as resolved:', error);
+      toast.error(t({ 
+        en: 'Failed to mark grievance as resolved', 
+        mr: 'तक्रारीचे निराकरण चिन्हांकित करण्यात अयशस्वी' 
+      }));
     }
   };
 
@@ -401,107 +841,11 @@ export function AdminPage() {
   const [selectedRecord, setSelectedRecord] = useState(null);
   const [uploadStatus, setUploadStatus] = useState('');
 
-  // Grievance management states
-  const [grievances, setGrievances] = useState([
-    {
-      id: 'GRV001',
-      title: 'Street Light Not Working',
-      titleMr: 'रस्ता दिवा काम करत नाही',
-      category: 'Infrastructure',
-      categoryMr: 'पायाभूत सुविधा',
-      description: 'The street light near temple is not working since 3 days',
-      descriptionMr: 'मंदिराजवळील रस्ता दिवा ३ दिवसांपासून काम करत नाही',
-      submittedBy: 'राम पाटील',
-      mobile: '+91 9876543210',
-      address: 'गल्ली नंबर ५',
-      priority: 'high',
-      status: 'pending',
-      adminStatus: 'unapproved', // New field for admin approval
-      submissionDate: '2024-01-10',
-      assignedWorker: null,
-      response: null,
-      photos: ['https://images.unsplash.com/photo-1578662996442-48f60103fc96']
-    },
-    {
-      id: 'GRV002',
-      title: 'Water Supply Issue',
-      titleMr: 'पाणीपुरवठ्याची समस्या',
-      category: 'Water',
-      categoryMr: 'पाणी',
-      description: 'Irregular water supply in ward 3',
-      descriptionMr: 'वार्ड ३ मध्ये अनियमित पाणीपुरवठा',
-      submittedBy: 'सुनीता देशमुख',
-      mobile: '+91 9876543211',
-      address: 'मुख्य रस्ता',
-      priority: 'urgent',
-      status: 'in-progress',
-      adminStatus: 'approved',
-      submissionDate: '2024-01-08',
-      assignedWorker: 'WRK001',
-      response: 'Water connection team has been notified',
-      photos: []
-    },
-    {
-      id: 'GRV003',
-      title: 'Road Repair Needed',
-      titleMr: 'रस्ता दुरुस्तीची गरज',
-      category: 'Roads',
-      categoryMr: 'रस्ते',
-      description: 'Main road has potholes causing inconvenience',
-      descriptionMr: 'मुख्य रस्त्यावर खड्डे असल्यामुळे अडचण होत आहे',
-      submittedBy: 'मोहन शर्मा',
-      mobile: '+91 9876543212',
-      address: 'शिवाजी चौक',
-      priority: 'normal',
-      status: 'resolved',
-      adminStatus: 'approved',
-      submissionDate: '2024-01-05',
-      assignedWorker: 'WRK002',
-      response: 'Road repair work completed successfully',
-      photos: ['https://images.unsplash.com/photo-1578662996442-48f60103fc96']
-    }
-  ]);
-
-  const [workers, setWorkers] = useState([
-    {
-      id: 'WRK001',
-      name: 'सुरेश जादव',
-      department: 'Water & Sanitation',
-      departmentMr: 'पाणी आणि स्वच्छता',
-      phone: '+91 9876501235',
-      email: 'suresh.jadav@rampur.gov.in',
-      specialization: 'Water Supply Management',
-      status: 'active'
-    },
-    {
-      id: 'WRK002',
-      name: 'अनिल पवार',
-      department: 'Roads & Transportation',
-      departmentMr: 'रस्ते आणि वाहतूक',
-      phone: '+91 9876501236',
-      email: 'anil.pawar@rampur.gov.in',
-      specialization: 'Road Maintenance',
-      status: 'active'
-    },
-    {
-      id: 'WRK003',
-      name: 'विजय इंजिनीअर',
-      department: 'Electricity',
-      departmentMr: 'वीज विभाग',
-      phone: '+91 9876501234',
-      email: 'vijay.engineer@rampur.gov.in',
-      specialization: 'Electrical Systems',
-      status: 'active'
-    }
-  ]);
-
-  // Grievance management UI states
   const [grievanceSearchTerm, setGrievanceSearchTerm] = useState('');
   const [grievanceStatusFilter, setGrievanceStatusFilter] = useState('All');
   const [grievanceAdminStatusFilter, setGrievanceAdminStatusFilter] = useState('All');
   const [grievanceCategoryFilter, setGrievanceCategoryFilter] = useState('All');
   const [grievanceCurrentPage, setGrievanceCurrentPage] = useState(1);
-  const [selectedGrievance, setSelectedGrievance] = useState(null);
   const [isGrievanceDetailOpen, setIsGrievanceDetailOpen] = useState(false);
   const [isWorkerManagementOpen, setIsWorkerManagementOpen] = useState(false);
   const [isAddWorkerOpen, setIsAddWorkerOpen] = useState(false);
@@ -758,134 +1102,12 @@ export function AdminPage() {
   });
 
   // News management states
-  const [newsItems, setNewsItems] = useState([
-    {
-      id: 1,
-      category: 'alerts',
-      priority: 'high',
-      title: { en: 'Water Supply Disruption Notice', mr: 'पाणी पुरवठा खंडित होण्याची सूचना' },
-      content: { 
-        en: 'Water supply will be disrupted on January 25th from 6 AM to 4 PM due to pipeline maintenance work. Residents are advised to store water in advance.',
-        mr: 'पाइपलाइन देखभाल कामामुळे २५ जानेवारी सकाळी ६ ते दुपारी ४ वाजेपर्यंत पाणी पुरवठा खंडित राहील. रहिवाशांना आगाऊ पाणी साठवण्याचा सल्ला दिला जातो.'
-      },
-      summary: {
-        en: 'Water disruption on Jan 25th from 6 AM to 4 PM',
-        mr: '२५ जानेवारी सकाळी ६ ते दुपारी ४ वाजेपर्यंत पाणी खंडित'
-      },
-      date: '2024-01-22',
-      time: '09:30 AM',
-      publishDate: '2024-01-22T09:30:00',
-      expiryDate: '2024-01-26T00:00:00',
-      isPublished: true,
-      isFeatured: true,
-      isBreaking: true,
-      image: null,
-      tags: ['water', 'maintenance', 'alert'],
-      author: 'Admin',
-      readCount: 245,
-      iconType: 'Droplets',
-      colorScheme: {
-        text: 'text-blue-600',
-        bg: 'bg-blue-50',
-        border: 'border-blue-200'
-      }
-    },
-    {
-      id: 2,
-      category: 'announcements',
-      priority: 'medium',
-      title: { en: 'Village Gram Sabha Meeting', mr: 'गाव ग्राम सभा बैठक' },
-      content: { 
-        en: 'Monthly Gram Sabha meeting scheduled for January 28th at 10 AM at the Village Panchayat Hall. All villagers are requested to attend.',
-        mr: '२८ जानेवारी सकाळी १० वाजता गाव पंचायत हॉलमध्ये मासिक ग्राम सभा बैठक नियोजित आहे. सर्व गावकऱ्यांना उपस्थित राहण्याची विनंती.'
-      },
-      summary: {
-        en: 'Monthly Gram Sabha meeting on Jan 28th at 10 AM',
-        mr: '२८ जानेवारी सकाळी १० वाजता मासिक ग्राम सभा बैठक'
-      },
-      date: '2024-01-20',
-      time: '02:15 PM',
-      publishDate: '2024-01-20T14:15:00',
-      expiryDate: '2024-01-29T00:00:00',
-      isPublished: true,
-      isFeatured: false,
-      isBreaking: false,
-      image: 'https://images.unsplash.com/photo-1667564790635-0f560121359e',
-      tags: ['meeting', 'gram-sabha', 'announcement'],
-      author: 'Sarpanch Office',
-      readCount: 156,
-      iconType: 'Megaphone',
-      colorScheme: {
-        text: 'text-purple-600',
-        bg: 'bg-purple-50',
-        border: 'border-purple-200'
-      }
-    },
-    {
-      id: 3,
-      category: 'utilities',
-      priority: 'medium',
-      title: { en: 'Electricity Maintenance Work', mr: 'वीज देखभाल कार्य' },
-      content: { 
-        en: 'Scheduled power outage on January 26th from 11 AM to 3 PM in Ward 2 and Ward 3 for transformer maintenance.',
-        mr: 'ट्रान्सफॉर्मर देखभालीसाठी २६ जानेवारी सकाळी ११ ते दुपारी ३ वाजेपर्यंत वार्ड २ आणि वार्ड ३ मध्ये नियोजित वीज खंडित.'
-      },
-      summary: {
-        en: 'Power outage on Jan 26th from 11 AM to 3 PM in Ward 2 & 3',
-        mr: '२६ जानेवारी सकाळी ११ ते दुपारी ३ वार्ड २ आणि ३ मध्ये वीज खंडित'
-      },
-      date: '2024-01-19',
-      time: '11:00 AM',
-      publishDate: '2024-01-19T11:00:00',
-      expiryDate: '2024-01-27T00:00:00',
-      isPublished: true,
-      isFeatured: false,
-      isBreaking: false,
-      image: null,
-      tags: ['electricity', 'maintenance', 'ward2', 'ward3'],
-      author: 'Electricity Department',
-      readCount: 98,
-      iconType: 'Zap',
-      colorScheme: {
-        text: 'text-yellow-600',
-        bg: 'bg-yellow-50',
-        border: 'border-yellow-200'
-      }
-    }
-  ]);
+  const [newsItems, setNewsItems] = useState([]);
 
-  const [newsCategories, setNewsCategories] = useState([
-    { id: 'announcements', label: { en: 'Announcements', mr: 'घोषणा' }, icon: 'Megaphone', count: 5 },
-    { id: 'events', label: { en: 'Events', mr: 'कार्यक्रम' }, icon: 'Calendar', count: 3 },
-    { id: 'alerts', label: { en: 'Alerts', mr: 'सूचना' }, icon: 'AlertTriangle', count: 2 },
-    { id: 'utilities', label: { en: 'Utilities', mr: 'सुविधा' }, icon: 'Zap', count: 4 },
-    { id: 'general', label: { en: 'General News', mr: 'सामान्य बातम्या' }, icon: 'Newspaper', count: 6 }
-  ]);
+  const [newsCategories, setNewsCategories] = useState([]);
 
-  const [upcomingEvents, setUpcomingEvents] = useState([
-    {
-      id: 1,
-      date: '28',
-      month: 'Jan',
-      year: '2024',
-      title: { en: 'Gram Sabha Meeting', mr: 'ग्राम सभा बैठक' },
-      time: '10:00 AM',
-      location: { en: 'Village Panchayat Hall', mr: 'गाव पंचायत हॉल' },
-      description: { en: 'Monthly village meeting', mr: 'मासिक गाव बैठक' },
-      isActive: true
-    },
-    {
-      id: 2,
-      date: '26',
-      month: 'Jan', 
-      year: '2024',
-      title: { en: 'Republic Day', mr: 'प्रजासत्ताक दिन' },
-      time: '08:00 AM',
-      location: { en: 'Village Ground', mr: 'गाव मैदान' },
-      description: { en: 'National celebration', mr: 'राष्ट्रीय सण' },
-      isActive: true
-    }
-  ]);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
+  const [newsStats, setNewsStats] = useState({});
 
   // News management UI states
   const [newsSearchTerm, setNewsSearchTerm] = useState('');
@@ -893,6 +1115,7 @@ export function AdminPage() {
   const [newsPriorityFilter, setNewsPriorityFilter] = useState('All');
   const [newsStatusFilter, setNewsStatusFilter] = useState('All');
   const [newsCurrentPage, setNewsCurrentPage] = useState(1);
+  const [newsViewMode, setNewsViewMode] = useState('list');
   const [selectedNews, setSelectedNews] = useState(null);
   const [isNewsDetailOpen, setIsNewsDetailOpen] = useState(false);
   const [isAddNewsOpen, setIsAddNewsOpen] = useState(false);
@@ -902,7 +1125,10 @@ export function AdminPage() {
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [isNewsCategoryManagementOpen, setIsNewsCategoryManagementOpen] = useState(false);
   const [isAddNewsCategoryOpen, setIsAddNewsCategoryOpen] = useState(false);
-  const [newsViewMode, setNewsViewMode] = useState('grid');
+  const [isWeatherManagementOpen, setIsWeatherManagementOpen] = useState(false);
+  const [isAddWeatherAlertOpen, setIsAddWeatherAlertOpen] = useState(false);
+  const [weatherAlerts, setWeatherAlerts] = useState([]);
+  const [weatherStats, setWeatherStats] = useState({});
   const [newNewsItem, setNewNewsItem] = useState({
     category: '',
     priority: 'medium',
@@ -921,9 +1147,19 @@ export function AdminPage() {
     title: { en: '', mr: '' },
     description: { en: '', mr: '' },
     location: { en: '', mr: '' },
-    date: '',
-    time: '',
+    eventDate: '',
+    eventTime: '',
     isActive: true
+  });
+  const [newWeatherAlert, setNewWeatherAlert] = useState({
+    title: { en: '', mr: '' },
+    message: { en: '', mr: '' },
+    alertType: 'warning',
+    severity: 'medium',
+    startDate: '',
+    endDate: '',
+    isActive: true,
+    icon: 'AlertTriangle'
   });
   const [newNewsCategory, setNewNewsCategory] = useState({
     label: { en: '', mr: '' },
@@ -1057,17 +1293,7 @@ export function AdminPage() {
   const newsStartIndex = (newsCurrentPage - 1) * newsPerPage;
   const paginatedNews = filteredNews.slice(newsStartIndex, newsStartIndex + newsPerPage);
 
-  // News statistics
-  const newsStats = {
-    total: newsItems.length,
-    published: newsItems.filter(n => n.isPublished).length,
-    draft: newsItems.filter(n => !n.isPublished).length,
-    featured: newsItems.filter(n => n.isFeatured).length,
-    breaking: newsItems.filter(n => n.isBreaking).length,
-    highPriority: newsItems.filter(n => n.priority === 'high').length,
-    totalReads: newsItems.reduce((sum, n) => sum + n.readCount, 0),
-    events: upcomingEvents.filter(e => e.isActive).length
-  };
+  // News statistics are now fetched from the API and stored in newsStats state
 
   // Helper functions
   const getStatusBadge = (status) => {
@@ -1211,61 +1437,8 @@ export function AdminPage() {
     );
   };
 
-  const handleApproveGrievance = (grievance) => {
-    const confirmed = window.confirm(`Approve grievance "${grievance.title}" by ${grievance.submittedBy}?`);
-    if (!confirmed) return;
 
-    setGrievances(grievances.map(g => 
-      g.id === grievance.id ? { ...g, adminStatus: 'approved' } : g
-    ));
-  };
 
-  const handleRejectGrievance = (grievance) => {
-    const confirmed = window.confirm(`Reject grievance "${grievance.title}" by ${grievance.submittedBy}?`);
-    if (!confirmed) return;
-
-    setGrievances(grievances.map(g => 
-      g.id === grievance.id ? { ...g, adminStatus: 'rejected', status: 'rejected' } : g
-    ));
-  };
-
-  const handleAssignWorker = (grievanceId, workerId) => {
-    setGrievances(grievances.map(g => 
-      g.id === grievanceId ? { ...g, assignedWorker: workerId, status: 'in-progress' } : g
-    ));
-  };
-
-  const handleUpdateGrievanceStatus = (grievanceId, newStatus) => {
-    setGrievances(grievances.map(g => 
-      g.id === grievanceId ? { ...g, status: newStatus } : g
-    ));
-  };
-
-  const handleAddWorker = () => {
-    if (!newWorker.name || !newWorker.department || !newWorker.phone) {
-      alert('Please fill all required fields');
-      return;
-    }
-
-    const worker = {
-      id: `WRK${String(Date.now()).slice(-3)}`,
-      ...newWorker,
-      status: 'active'
-    };
-
-    setWorkers([...workers, worker]);
-    setNewWorker({ name: '', department: '', departmentMr: '', phone: '', email: '', specialization: '' });
-    setIsAddWorkerOpen(false);
-  };
-
-  const handleUpdateWorker = () => {
-    if (!selectedWorker) return;
-    
-    setWorkers(workers.map(w => 
-      w.id === selectedWorker.id ? selectedWorker : w
-    ));
-    setSelectedWorker(null);
-  };
 
   // Villager management helper functions
   const getVillagerStatusBadge = (status) => {
@@ -1659,86 +1832,103 @@ export function AdminPage() {
   };
 
   // News management helper functions
-  const handleAddNews = () => {
+  const handleAddNews = async () => {
     if (!newNewsItem.title.en || !newNewsItem.category || !newNewsItem.content.en) {
-      alert('Please fill all required fields');
+      toast.error('Please fill all required fields');
       return;
     }
 
-    const newsItem = {
-      id: Date.now(),
-      category: newNewsItem.category,
-      priority: newNewsItem.priority,
-      title: newNewsItem.title,
-      content: newNewsItem.content,
-      summary: newNewsItem.summary,
-      date: new Date().toISOString().split('T')[0],
-      time: new Date().toLocaleTimeString('en-US', { hour12: true, hour: '2-digit', minute: '2-digit' }),
-      publishDate: newNewsItem.publishDate || new Date().toISOString(),
-      expiryDate: newNewsItem.expiryDate,
-      isPublished: true,
-      isFeatured: newNewsItem.isFeatured,
-      isBreaking: newNewsItem.isBreaking,
-      image: newNewsItem.image,
-      tags: newNewsItem.tags,
-      author: 'Admin',
-      readCount: 0,
-      iconType: newNewsItem.iconType,
-      colorScheme: getColorSchemeForCategory(newNewsItem.category)
-    };
+    try {
+      // Prepare the data for the API call
+      const newsData = {
+        title: newNewsItem.title,
+        summary: newNewsItem.summary,
+        content: newNewsItem.content,
+        category: newNewsItem.category,
+        priority: newNewsItem.priority,
+        tags: newNewsItem.tags,
+        imageUrl: newNewsItem.image,
+        publishDate: newNewsItem.publishDate || new Date(),
+        expiryDate: newNewsItem.expiryDate || undefined,
+        isPublished: true,
+        isFeatured: newNewsItem.isFeatured,
+        isBreaking: newNewsItem.isBreaking
+      };
 
-    setNewsItems([newsItem, ...newsItems]);
-    
-    // Update category count
-    setNewsCategories(prevCategories => 
-      prevCategories.map(cat => 
-        cat.id === newNewsItem.category 
-          ? { ...cat, count: cat.count + 1 }
-          : cat
-      )
-    );
-
-    setNewNewsItem({
-      category: '',
-      priority: 'medium',
-      title: { en: '', mr: '' },
-      content: { en: '', mr: '' },
-      summary: { en: '', mr: '' },
-      tags: [],
-      image: null,
-      isFeatured: false,
-      isBreaking: false,
-      publishDate: '',
-      expiryDate: '',
-      iconType: 'Newspaper'
-    });
-    setIsAddNewsOpen(false);
+      // Call the API to create the news article
+      console.log('Creating news article with data:', newsData);
+      const response = await adminCreateNewsArticle(newsData);
+      console.log('News article creation response:', response);
+      
+      // Show success message
+      toast.success('News article created successfully!');
+      
+      // Refresh the news data from the backend
+      await fetchNewsData();
+      
+      // Reset the form
+      setNewNewsItem({
+        category: '',
+        priority: 'medium',
+        title: { en: '', mr: '' },
+        content: { en: '', mr: '' },
+        summary: { en: '', mr: '' },
+        tags: [],
+        image: null,
+        isFeatured: false,
+        isBreaking: false,
+        publishDate: '',
+        expiryDate: '',
+        iconType: 'Newspaper'
+      });
+      
+      // Close the modal
+      setIsAddNewsOpen(false);
+    } catch (error) {
+      console.error('Failed to create news article:', error);
+      toast.error('Failed to create news article. Please try again.');
+    }
   };
 
-  const handleUpdateNews = () => {
+  const handleUpdateNews = async () => {
     if (!selectedNews) return;
-    
-    setNewsItems(newsItems.map(n => 
-      n.id === selectedNews.id ? selectedNews : n
-    ));
-    setSelectedNews(null);
-    setIsEditNewsOpen(false);
+
+    try {
+      // Call the API to update the news article
+      await adminUpdateNewsArticle(selectedNews._id, selectedNews);
+      
+      // Show success message
+      toast.success('News article updated successfully!');
+      
+      // Refresh the news data from the backend
+      await fetchNewsData();
+      
+      // Close the modal and reset selection
+      setIsEditNewsOpen(false);
+      setSelectedNews(null);
+    } catch (error) {
+      console.error('Failed to update news article:', error);
+      toast.error('Failed to update news article. Please try again.');
+    }
   };
 
-  const handleDeleteNews = (news) => {
-    const confirmed = window.confirm(`Are you sure you want to delete "${news.title.en}"?`);
+  const handleDeleteNews = async (newsId) => {
+    const confirmed = window.confirm('Are you sure you want to delete this news article? This action cannot be undone.');
     if (!confirmed) return;
 
-    setNewsItems(newsItems.filter(n => n.id !== news.id));
-    
-    // Update category count
-    setNewsCategories(prevCategories => 
-      prevCategories.map(cat => 
-        cat.id === news.category 
-          ? { ...cat, count: Math.max(0, cat.count - 1) }
-          : cat
-      )
-    );
+    try {
+      // Call the API to delete the news article
+      await adminDeleteNewsArticle(newsId);
+      
+      // Show success message
+      toast.success('News article deleted successfully!');
+      
+      // Refresh the news data from the backend
+      await fetchNewsData();
+    } catch (error) {
+      console.error('Failed to delete news article:', error);
+      toast.error('Failed to delete news article. Please try again.');
+    }
   };
 
   const handleToggleNewsStatus = (news) => {
@@ -1770,66 +1960,198 @@ export function AdminPage() {
     return schemes[category] || schemes['general'];
   };
 
-  const handleAddEvent = () => {
-    if (!newEvent.title.en || !newEvent.date || !newEvent.time) {
-      alert('Please fill all required fields');
+  const handleAddEvent = async () => {
+    if (!newEvent.title.en || !newEvent.title.mr || !newEvent.eventDate || !newEvent.eventTime) {
+      toast.error('Please fill all required fields (Title in both languages, Date, and Time)');
       return;
     }
 
-    const event = {
-      id: Date.now(),
-      date: new Date(newEvent.date).getDate().toString(),
-      month: new Date(newEvent.date).toLocaleDateString('en-US', { month: 'short' }),
-      year: new Date(newEvent.date).getFullYear().toString(),
-      title: newEvent.title,
-      time: newEvent.time,
-      location: newEvent.location,
-      description: newEvent.description,
-      isActive: newEvent.isActive
-    };
+    try {
+      // Prepare the data for the API call
+      const eventData = {
+        title: newEvent.title,
+        description: newEvent.description,
+        location: newEvent.location,
+        eventDate: newEvent.eventDate,
+        eventTime: newEvent.eventTime,
+        isActive: newEvent.isActive
+      };
 
-    setUpcomingEvents([...upcomingEvents, event]);
-    setNewEvent({
-      title: { en: '', mr: '' },
-      description: { en: '', mr: '' },
-      location: { en: '', mr: '' },
-      date: '',
-      time: '',
-      isActive: true
-    });
-    setIsAddEventOpen(false);
+      console.log('Creating event with data:', eventData);
+
+      // Call the API to create the event
+      const response = await adminCreateEvent(eventData);
+      console.log('Event creation response:', response);
+      
+      // Show success message
+      toast.success('Event created successfully!');
+      
+      // Refresh the events data from the backend
+      await fetchEvents();
+      
+      // Reset the form
+      setNewEvent({
+        title: { en: '', mr: '' },
+        description: { en: '', mr: '' },
+        location: { en: '', mr: '' },
+        eventDate: '',
+        eventTime: '',
+        isActive: true
+      });
+      
+      // Close the modal
+      setIsAddEventOpen(false);
+    } catch (error) {
+      console.error('Failed to create event:', error);
+      toast.error(`Failed to create event: ${error.response?.data?.message || error.message}`);
+    }
   };
 
-  const handleDeleteEvent = (eventId) => {
-    const confirmed = window.confirm('Are you sure you want to delete this event?');
+  const handleDeleteEvent = async (eventId) => {
+    const confirmed = window.confirm('Are you sure you want to delete this event? This action cannot be undone.');
     if (!confirmed) return;
 
-    setUpcomingEvents(upcomingEvents.filter(e => e.id !== eventId));
+    try {
+      // Call the API to delete the event
+      await adminDeleteEvent(eventId);
+      
+      // Show success message
+      toast.success('Event deleted successfully!');
+      
+      // Refresh the events data from the backend
+      await fetchEvents();
+    } catch (error) {
+      console.error('Failed to delete event:', error);
+      toast.error('Failed to delete event. Please try again.');
+    }
   };
 
-  const handleAddNewsCategory = () => {
+  // Weather Alert handlers
+  const fetchWeatherAlerts = async () => {
+    try {
+      const [alertsRes, statsRes] = await Promise.all([
+        adminGetAllWeatherAlerts(),
+        adminGetWeatherAlertStats()
+      ]);
+      setWeatherAlerts(alertsRes.data);
+      setWeatherStats(statsRes.data);
+    } catch (error) {
+      console.error('Failed to fetch weather alerts:', error);
+      toast.error('Failed to fetch weather alerts');
+    }
+  };
+
+  const handleAddWeatherAlert = async () => {
+    if (!newWeatherAlert.title.en || !newWeatherAlert.title.mr || !newWeatherAlert.startDate || !newWeatherAlert.endDate) {
+      toast.error('Please fill all required fields (Title in both languages, Start Date, and End Date)');
+      return;
+    }
+
+    try {
+      const alertData = {
+        title: newWeatherAlert.title,
+        message: newWeatherAlert.message,
+        alertType: newWeatherAlert.alertType,
+        severity: newWeatherAlert.severity,
+        startDate: newWeatherAlert.startDate,
+        endDate: newWeatherAlert.endDate,
+        isActive: newWeatherAlert.isActive,
+        icon: newWeatherAlert.icon
+      };
+
+      console.log('Creating weather alert with data:', alertData);
+
+      const response = await adminCreateWeatherAlert(alertData);
+      console.log('Weather alert creation response:', response);
+      
+      toast.success('Weather alert created successfully!');
+      
+      await fetchWeatherAlerts();
+      
+      setNewWeatherAlert({
+        title: { en: '', mr: '' },
+        message: { en: '', mr: '' },
+        alertType: 'warning',
+        severity: 'medium',
+        startDate: '',
+        endDate: '',
+        isActive: true,
+        icon: 'AlertTriangle'
+      });
+      
+      setIsAddWeatherAlertOpen(false);
+    } catch (error) {
+      console.error('Failed to create weather alert:', error);
+      toast.error(`Failed to create weather alert: ${error.response?.data?.message || error.message}`);
+    }
+  };
+
+  const handleDeleteWeatherAlert = async (alertId) => {
+    const confirmed = window.confirm('Are you sure you want to delete this weather alert? This action cannot be undone.');
+    if (!confirmed) return;
+
+    try {
+      await adminDeleteWeatherAlert(alertId);
+      
+      toast.success('Weather alert deleted successfully!');
+      
+      await fetchWeatherAlerts();
+    } catch (error) {
+      console.error('Failed to delete weather alert:', error);
+      toast.error('Failed to delete weather alert. Please try again.');
+    }
+  };
+
+  const handleAddNewsCategory = async () => {
     if (!newNewsCategory.label.en) {
-      alert('Please fill the category name');
+      toast.error('Please fill the category name');
       return;
     }
 
-    const category = {
-      id: newNewsCategory.label.en.toLowerCase().replace(/\s+/g, '-'),
-      label: newNewsCategory.label,
-      icon: newNewsCategory.icon,
-      count: 0
-    };
+    try {
+      // Prepare the data for the API call
+      const categoryData = {
+        name: newNewsCategory.label,
+        icon: newNewsCategory.icon
+      };
 
-    setNewsCategories([...newsCategories, category]);
-    setNewNewsCategory({ label: { en: '', mr: '' }, icon: 'Newspaper' });
-    setIsAddNewsCategoryOpen(false);
+      // Call the API to create the category
+      await adminCreateCategory(categoryData);
+      
+      // Show success message
+      toast.success('News category created successfully!');
+      
+      // Refresh the categories data from the backend
+      await fetchCategories();
+      
+      // Reset the form
+      setNewNewsCategory({ label: { en: '', mr: '' }, icon: 'Newspaper' });
+      
+      // Close the modal
+      setIsAddNewsCategoryOpen(false);
+    } catch (error) {
+      console.error('Failed to create news category:', error);
+      toast.error('Failed to create news category. Please try again.');
+    }
   };
 
-  const handleDeleteNewsCategory = (categoryId) => {
-    const confirmed = window.confirm('Are you sure you want to delete this category?');
+  const handleDeleteNewsCategory = async (categoryId) => {
+    const confirmed = window.confirm('Are you sure you want to delete this category? This action cannot be undone.');
     if (!confirmed) return;
 
-    setNewsCategories(newsCategories.filter(cat => cat.id !== categoryId));
+    try {
+      // Call the API to delete the category
+      await adminDeleteCategory(categoryId);
+      
+      // Show success message
+      toast.success('News category deleted successfully!');
+      
+      // Refresh the categories data from the backend
+      await fetchCategories();
+    } catch (error) {
+      console.error('Failed to delete news category:', error);
+      toast.error('Failed to delete news category. Please try again.');
+    }
   };
 
   const exportNewsToCSV = () => {
@@ -2202,36 +2524,40 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
       <div className="container mx-auto px-6 py-8">
         {/* Navigation Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-7">
-            <TabsTrigger value="home">
-              <Home className="h-4 w-4 mr-2" />
-              {t({ en: 'Home Content', mr: 'होम सामग्री' })}
-            </TabsTrigger>
-            <TabsTrigger value="tax">
-              <CreditCard className="h-4 w-4 mr-2" />
-              {t({ en: 'Tax Management', mr: 'कर व्यवस्थापन' })}
-            </TabsTrigger>
-            <TabsTrigger value="grievances">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              {t({ en: 'Grievances', mr: 'तक्रारी' })}
-            </TabsTrigger>
-            <TabsTrigger value="villagers">
-              <User className="h-4 w-4 mr-2" />
-              {t({ en: 'Villagers', mr: 'गावकरी' })}
-            </TabsTrigger>
-            <TabsTrigger value="committee">
-              <UserCheck className="h-4 w-4 mr-2" />
-              {t({ en: 'Committee', mr: 'समिती' })}
-            </TabsTrigger>
-            <TabsTrigger value="media">
-              <Camera className="h-4 w-4 mr-2" />
-              {t({ en: 'Media', mr: 'मीडिया' })}
-            </TabsTrigger>
-            <TabsTrigger value="news">
-              <Newspaper className="h-4 w-4 mr-2" />
-              {t({ en: 'News', mr: 'वार्ता' })}
-            </TabsTrigger>
-          </TabsList>
+          <div className="w-full bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+            <TabsList className="grid w-full grid-cols-1 h-auto p-0 bg-white">
+              <div className="flex flex-wrap w-full">
+                <TabsTrigger value="home" className="flex-1 min-w-0 justify-center px-3 py-3 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors">
+                  <Home className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">{t({ en: 'Home Content', mr: 'होम सामग्री' })}</span>
+                </TabsTrigger>
+                <TabsTrigger value="tax" className="flex-1 min-w-0 justify-center px-3 py-3 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors">
+                  <CreditCard className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">{t({ en: 'Tax Management', mr: 'कर व्यवस्थापन' })}</span>
+                </TabsTrigger>
+                <TabsTrigger value="grievances" className="flex-1 min-w-0 justify-center px-3 py-3 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors">
+                  <MessageSquare className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">{t({ en: 'Grievances', mr: 'तक्रारी' })}</span>
+                </TabsTrigger>
+                <TabsTrigger value="villagers" className="flex-1 min-w-0 justify-center px-3 py-3 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors">
+                  <User className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">{t({ en: 'Villagers', mr: 'गावकरी' })}</span>
+                </TabsTrigger>
+                <TabsTrigger value="committee" className="flex-1 min-w-0 justify-center px-3 py-3 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors">
+                  <UserCheck className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">{t({ en: 'Committee', mr: 'समिती' })}</span>
+                </TabsTrigger>
+                <TabsTrigger value="media" className="flex-1 min-w-0 justify-center px-3 py-3 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors">
+                  <Camera className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">{t({ en: 'Media', mr: 'मीडिया' })}</span>
+                </TabsTrigger>
+                <TabsTrigger value="news" className="flex-1 min-w-0 justify-center px-3 py-3 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors">
+                  <Newspaper className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">{t({ en: 'News', mr: 'वार्ता' })}</span>
+                </TabsTrigger>
+              </div>
+            </TabsList>
+          </div>
 
           {/* Villager Management Tab */}
           <TabsContent value="villagers" className="space-y-6">
@@ -2246,7 +2572,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 </p>
                           </div>
                           <div className="flex gap-2">
-                <Button onClick={handleOpenAddModal} className="bg-blue-600 hover:bg-blue-700">
+                <Button onClick={handleOpenAddModal} className="bg-gray-800 hover:bg-gray-900 text-white">
                     <Plus className="h-4 w-4 mr-2" />
                   {t({ en: 'Add Villager', mr: 'गावकरी जोडा' })}
                   </Button>
@@ -2610,14 +2936,642 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
           </TabsContent>
 
           <TabsContent value="grievances">
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                {t({ en: 'Grievance Management', mr: 'तक्रार व्यवस्थापन' })}
-              </h3>
-              <p className="text-gray-600">
-                {t({ en: 'Handle village grievances and complaints', mr: 'गाव तक्रार आणि शिकायतींचे निराकरण करा' })}
-              </p>
+            <div className="space-y-6">
+              {/* Grievance Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <Card className="border-l-4 border-l-blue-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">{t({ en: 'Pending Approval', mr: 'प्रलंबित मंजुरी' })}</p>
+                        <p className="text-2xl font-bold text-blue-600">
+                          {grievanceLoading ? '-' : grievances.filter(g => g.adminStatus === 'Unapproved').length}
+                        </p>
+                      </div>
+                      <MessageSquare className="h-8 w-8 text-blue-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-l-4 border-l-yellow-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">{t({ en: 'In Progress', mr: 'प्रगतीपथावर' })}</p>
+                        <p className="text-2xl font-bold text-yellow-600">
+                          {grievanceLoading ? '-' : grievances.filter(g => g.progressStatus === 'In-progress').length}
+                        </p>
+                      </div>
+                      <Clock className="h-8 w-8 text-yellow-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-l-4 border-l-green-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">{t({ en: 'Resolved', mr: 'निराकरण झाले' })}</p>
+                        <p className="text-2xl font-bold text-green-600">
+                          {grievanceLoading ? '-' : grievances.filter(g => g.progressStatus === 'Resolved').length}
+                        </p>
+                      </div>
+                      <CheckCircle className="h-8 w-8 text-green-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-l-4 border-l-purple-500">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm text-gray-600">{t({ en: 'Total Workers', mr: 'एकूण कामगार' })}</p>
+                        <p className="text-2xl font-bold text-purple-600">
+                          {grievanceLoading ? '-' : workers.filter(w => w.status === 'active').length}
+                        </p>
+                      </div>
+                      <BadgeIcon className="h-8 w-8 text-purple-500" />
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
+
+              {/* Worker Management Button */}
+              <div className="flex justify-end mb-4">
+                <Dialog open={isWorkerModalOpen} onOpenChange={setIsWorkerModalOpen}>
+                  <DialogTrigger asChild>
+                    <Button onClick={handleOpenWorkerModal} className="bg-gray-800 hover:bg-gray-900 text-white">
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t({ en: 'Manage Workers', mr: 'कामगार व्यवस्थापन' })}
+                    </Button>
+                  </DialogTrigger>
+
+                  <DialogContent className="max-w-4xl">
+                    <DialogHeader>
+                      <DialogTitle className="text-2xl font-bold">
+                        {t({ en: 'Worker Management', mr: 'कामगार व्यवस्थापन' })}
+                      </DialogTitle>
+                    </DialogHeader>
+                    
+                    <div className="space-y-6">
+                      {/* Current Workers List */}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">
+                          {t({ en: 'Current Workers', mr: 'वर्तमान कामगार' })}
+              </h3>
+                        <div className="grid gap-4">
+                          {workers.map((worker) => (
+                            <div key={worker._id} className="border rounded-lg p-4">
+                              <div className="flex justify-between items-center">
+                                <div>
+                                  <h4 className="font-semibold">{worker.name}</h4>
+                                  <p className="text-sm text-gray-600">{worker.department}</p>
+                                  <div className="flex gap-4 mt-1 text-sm">
+                                    {worker.phone && <span>📞 {worker.phone}</span>}
+                                    {worker.email && <span>📧 {worker.email}</span>}
+                                    <span className={
+                                      worker.status === 'active' 
+                                        ? 'text-green-600 font-medium' 
+                                        : 'text-gray-500'
+                                    }>
+                                      {worker.status === 'active' ? '🟢 Active' : '🔴 Inactive'}
+                                    </span>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    size="sm" 
+                                    variant="outline"
+                                    onClick={() => handleEditWorkerClick(worker)}
+                                  >
+                                    <Edit className="h-4 w-4 mr-1" />
+                                    {t({ en: 'Edit', mr: 'सुधारा' })}
+                                  </Button>
+                                  <Button 
+                                    size="sm" 
+                                    variant="destructive"
+                                    onClick={() => handleDeleteWorker(worker._id)}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-1" />
+                                    {t({ en: 'Delete', mr: 'हटवा' })}
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          ))}
+                          {workers.length === 0 && (
+                            <div className="text-center py-8 text-gray-500">
+                              {t({ en: 'No workers found', mr: 'कोणत्याही कामगारांचा दिसत नाही' })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Worker Form */}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">
+                          {editingWorker 
+                            ? t({ en: 'Edit Worker', mr: 'कामगार सुधारा' })
+                            : t({ en: 'Add New Worker', mr: 'नवीन कामगार जोडा' })
+                          }
+                        </h3>
+                        
+                        <form onSubmit={handleWorkerFormSubmit} className="space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="name">{t({ en: 'Name', mr: 'नाव' })} *</Label>
+                              <Input
+                                id="name"
+                                name="name"
+                                value={workerFormData.name}
+                                onChange={handleWorkerFormChange}
+                                placeholder={t({ en: 'Enter worker name', mr: 'कामगाराचे नाव टाका' })}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="department">{t({ en: 'Department', mr: 'विभाग' })} *</Label>
+                              <Input
+                                id="department"
+                                name="department"
+                                value={workerFormData.department}
+                                onChange={handleWorkerFormChange}
+                                placeholder={t({ en: 'Enter department', mr: 'विभाग टाका' })}
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="phone">{t({ en: 'Phone', mr: 'फोन' })}</Label>
+                              <Input
+                                id="phone"
+                                name="phone"
+                                value={workerFormData.phone}
+                                onChange={handleWorkerFormChange}
+                                placeholder={t({ en: 'Enter phone number', mr: 'फोन नंबर टाका' })}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="email">{t({ en: 'Email', mr: 'ईमेल' })}</Label>
+                              <Input
+                                id="email"
+                                name="email"
+                                type="email"
+                                value={workerFormData.email}
+                                onChange={handleWorkerFormChange}
+                                placeholder={t({ en: 'Enter email address', mr: 'ईमेल पत्ता टाका' })}
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="status">{t({ en: 'Status', mr: 'स्थिती' })}</Label>
+                              <Select
+                                name="status"
+                                value={workerFormData.status}
+                                onValueChange={(value) => 
+                                  setWorkerFormData(prev => ({ ...prev, status: value }))
+                                }
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={t({ en: 'Select status', mr: 'स्थिती निवडा' })} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="active">{t({ en: 'Active', mr: 'सक्रिय' })}</SelectItem>
+                                  <SelectItem value="inactive">{t({ en: 'Inactive', mr: 'निष्क्रिय' })}</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          
+                          <div className="flex gap-3 pt-4">
+                            <Button 
+                              type="submit" 
+                              className="bg-gray-800 hover:bg-gray-900 text-white flex-1"
+                            >
+                              {editingWorker 
+                                ? t({ en: 'Update Worker', mr: 'कामगार अद्यतनित करा' })
+                                : t({ en: 'Add Worker', mr: 'कामगार जोडा' })
+                              }
+                            </Button>
+                            <Button 
+                              type="button"
+                              variant="outline" 
+                              onClick={() => setIsWorkerModalOpen(false)}
+                            >
+                              {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                            </Button>
+                          </div>
+                        </form>
+                      </div>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
+
+              {/* Grievances Table */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold">{t({ en: 'All Grievances', mr: 'सर्व तक्रारी' })}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {grievanceLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t({ en: 'ID', mr: 'आयडी' })}</TableHead>
+                            <TableHead>{t({ en: 'Title', mr: 'विषय' })}</TableHead>
+                            <TableHead>{t({ en: 'Submitted By', mr: 'सबमिट केले' })}</TableHead>
+                            <TableHead>{t({ en: 'Category', mr: 'श्रेणी' })}</TableHead>
+                            <TableHead>{t({ en: 'Priority', mr: 'प्राधान्यता' })}</TableHead>
+                            <TableHead>{t({ en: 'Admin Status', mr: 'व्यवस्थापक स्थिती' })}</TableHead>
+                            <TableHead>{t({ en: 'Progress Status', mr: 'प्रगती स्थिती' })}</TableHead>
+                            <TableHead>{t({ en: 'Assigned Worker', mr: 'नियुक्त कामगार' })}</TableHead>
+                            <TableHead>{t({ en: 'Action', mr: 'क्रिया' })}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {grievances.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                                {t({ en: 'No grievances found', mr: 'कोणत्याही तक्रारी नाही' })}
+                              </TableCell>
+                            </TableRow>
+                          ) : (
+                            grievances.map((grievance) => (
+                              <TableRow key={grievance._id}>
+                                <TableCell className="font-medium">{grievance._id.substring(0, 8)}...</TableCell>
+                                <TableCell className="max-w-xs truncate">{grievance.title}</TableCell>
+                                <TableCell>{grievance.submittedBy?.name || 'N/A'}</TableCell>
+                                <TableCell>
+                                  <Badge variant="secondary">{grievance.category}</Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={
+                                    grievance.priority === 'Urgent' ? 'destructive' : 
+                                    grievance.priority === 'High' ? 'default' : 'secondary'
+                                  }>
+                                    {grievance.priority}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={
+                                    grievance.adminStatus === 'Approved' ? 'default' : 
+                                    grievance.adminStatus === 'Rejected' ? 'destructive' : 'secondary'
+                                  }>
+                                    {grievance.adminStatus}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={
+                                    grievance.progressStatus === 'Resolved' ? 'default' : 
+                                    grievance.progressStatus === 'In-progress' ? 'secondary' : '_outline'
+                                  }>
+                                    {grievance.progressStatus}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell>{grievance.assignedWorker?.name || 'Unassigned'}</TableCell>
+                                <TableCell>
+                                  <div className="flex space-x-2">
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => handleOpenDetailModal(grievance)}
+                                    >
+                                      {t({ en: 'View', mr: 'पहा' })}
+                                    </Button>
+                                    {grievance.adminStatus === 'Unapproved' && (
+                                      <>
+                                        <Button 
+                                          size="sm" 
+                                          style={{ backgroundColor: '#18d235', color: 'white' }}
+                                          onClick={() => handleUpdateAdminStatus(grievance._id, 'Approved')}
+                                        >
+                                          {t({ en: 'Approve', mr: 'मंजूर' })}
+                                        </Button>
+                                        <Button 
+                                          size="sm" 
+                                          variant="destructive"
+                                          onClick={() => handleUpdateAdminStatus(grievance._id, 'Rejected')}
+                                        >
+                                          {t({ en: 'Reject', mr: 'नकार' })}
+                                        </Button>
+                                      </>
+                                    )}
+                                  </div>
+                                </TableCell>
+                              </TableRow>
+                            ))
+                          )}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Grievance Detail Modal */}
+            <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
+              <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                <DialogHeader>
+                  <DialogTitle className="text-2xl font-bold">
+                    {t({ en: 'Grievance Details', mr: 'तक्रार तपशील' })}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {t({ en: 'View and manage grievance information', mr: 'तक्रार माहिती पहा आणि व्यवस्थापित करा' })}
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {selectedGrievance ? (
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="space-y-6 p-1">
+                      {/* Header Notice */}
+                      <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded-md">
+                        <div className="flex items-center">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm text-blue-700">
+                              <strong>Scroll down to view all grievance information, including photos and management actions.</strong>
+                              <br />
+                              <span className="text-xs text-blue-600">🔧 Photos are compressed & stored efficiently - images will load reliably after page refresh!</span>
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    
+                    {/* Grievance Information */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h3 className="text-lg font-semibold mb-3">{t({ en: 'Basic Information', mr: 'मूलभूत माहिती' })}</h3>
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="font-medium">{t({ en: 'ID', mr: 'आयडी' })}</Label>
+                            <p className="text-gray-700 text-xs">{selectedGrievance._id}</p>
+                          </div>
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Photo Summary', mr: 'फोटो सारांश' })}</Label>
+                            <div className="text-xs text-gray-600 space-y-1">
+                              <div className="flex gap-4">
+                                <span><strong>{t({ en: 'Submitted Photos:', mr: 'सबमिट केलेले फोटो:' })}</strong> {selectedGrievance.photos ? selectedGrievance.photos.length : 0}</span>
+                                <span><strong>{t({ en: 'Resolution Photos:', mr: 'निराकरण फोटो:' })}</strong> {selectedGrievance.resolutionPhotos ? selectedGrievance.resolutionPhotos.length : 0}</span>
+                              </div>
+                              <div className="text-xs text-gray-500 bg-gray-50 p-2 rounded border">
+                                {t({ en: '📸 Photos loaded successfully', mr: '📸 फोटो यशस्वीरित्या लोड झाले' })}
+                              </div>
+                            </div>
+                          </div>
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Title', mr: 'विषय' })}</Label>
+                            <p className="text-gray-700">{selectedGrievance.title || 'No title provided'}</p>
+                          </div>
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Description', mr: 'वर्णन' })}</Label>
+                            <p className="text-gray-700">{selectedGrievance.description || 'No description provided'}</p>
+                          </div>
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Category', mr: 'श्रेणी' })}</Label>
+                            <Badge variant="secondary">{selectedGrievance.category || 'No category'}</Badge>
+                          </div>
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Priority', mr: 'प्राधान्यता' })}</Label>
+                            <Badge variant={
+                              selectedGrievance.priority === 'Urgent' ? 'destructive' : 
+                              selectedGrievance.priority === 'High' ? 'default' : 'secondary'
+                            }>
+                              {selectedGrievance.priority || 'Normal'}
+                            </Badge>
+                          </div>
+                          {selectedGrievance.location && (
+                            <div>
+                              <Label className="font-medium">{t({ en: 'Location', mr: 'स्थान' })}</Label>
+                              <p className="text-gray-700">📍 {selectedGrievance.location}</p>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-lg font-semibold mb-3">{t({ en: 'Status & Assignment', mr: 'स्थिती आणि नियुक्ती' })}</h3>
+                        <div className="space-y-3">
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Admin Status', mr: 'व्यवस्थापक स्थिती' })}</Label>
+                            <Badge variant={
+                              selectedGrievance.adminStatus === 'Approved' ? 'default' : 
+                              selectedGrievance.adminStatus === 'Rejected' ? 'destructive' : 'secondary'
+                            }>
+                              {selectedGrievance.adminStatus}
+                            </Badge>
+                          </div>
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Progress Status', mr: 'प्रगती स्थिती' })}</Label>
+                            <Badge variant={
+                              selectedGrievance.progressStatus === 'Resolved' ? 'default' : 
+                              selectedGrievance.progressStatus === 'In-progress' ? 'secondary' : '_outline'
+                            }>
+                              {selectedGrievance.progressStatus}
+                            </Badge>
+                          </div>
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Assigned Worker', mr: 'नियुक्त कामगार' })}</Label>
+                            <p className="text-gray-700">
+                              {selectedGrievance.assignedWorker?.name || t({ en: 'Unassigned', mr: 'नियुक्त नाही' })}
+                            </p>
+                            {selectedGrievance.assignedWorker && (
+                              <p className="text-sm text-gray-500">
+                                {selectedGrievance.assignedWorker.department}
+                              </p>
+                            )}
+              </div>
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Submitted By', mr: 'सबमिट केले' })}</Label>
+                            <p className="text-gray-700">{selectedGrievance.submittedBy?.name || 'N/A'}</p>
+                            {selectedGrievance.adminStatus === 'Approved' && selectedGrievance.submittedBy?.email && (
+                              <p className="text-sm text-gray-500">{selectedGrievance.submittedBy.email}</p>
+                            )}
+                          </div>
+                          <div>
+                            <Label className="font-medium">{t({ en: 'Submitted Date', mr: 'सबमिट दिनांक' })}</Label>
+                            <p className="text-gray-700">
+                              {new Date(selectedGrievance.createdAt).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Controls */}
+                    {selectedGrievance.adminStatus === 'Unapproved' && (
+                      <div className="border-t pt-4">
+                        <h3 className="text-lg font-semibold mb-3">{t({ en: 'Admin Actions', mr: 'प्रशासक क्रिया' })}</h3>
+                        <div className="flex gap-3">
+                          <Button 
+                            style={{ backgroundColor: '#18d235', color: 'white' }}
+                            onClick={() => handleUpdateAdminStatus(selectedGrievance._id, 'Approved')}
+                          >
+                            <CheckCircle className="h-4 w-4 mr-2" />
+                            {t({ en: 'Approve', mr: 'मंजूर' })}
+                          </Button>
+                          <Button 
+                            variant="destructive"
+                            onClick={() => handleUpdateAdminStatus(selectedGrievance._id, 'Rejected')}
+                          >
+                            <AlertTriangle className="h-4 w-4 mr-2" />
+                            {t({ en: 'Reject', mr: 'नकार' })}
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Worker Assignment */}
+                    {selectedGrievance.adminStatus === 'Approved' && (
+                      <div className="border-t pt-4">
+                        <h3 className="text-lg font-semibold mb-3">{t({ en: 'Worker Assignment', mr: 'कामगार नियुक्ती' })}</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor="worker-select">{t({ en: 'Assign Worker', mr: 'कामगार नियुक्त करा' })}</Label>
+                            <Select
+                              value={selectedGrievance.assignedWorker?._id || 'unassigned'}
+                              onValueChange={(workerId) => handleAssignWorker(workerId)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder={t({ en: 'Select a worker', mr: 'कामगार निवडा' })} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="unassigned">{t({ en: 'Unassigned', mr: 'नियुक्त नाही' })}</SelectItem>
+                                {workers.map((worker) => (
+                                  <SelectItem key={worker._id} value={worker._id}>
+                                    {worker.name} - {worker.department}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          
+                          <div>
+                            <Label htmlFor="status-select">{t({ en: 'Update Status', mr: 'स्थिती अद्यतनित करा' })}</Label>
+                            <Select
+                              value={selectedGrievance.progressStatus || 'Pending'}
+                              onValueChange={(status) => handleUpdateProgress(status)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder={t({ en: 'Select status', mr: 'स्थिती निवडा' })} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Pending">{t({ en: 'Pending', mr: 'प्रलंबित' })}</SelectItem>
+                                <SelectItem value="In-progress">{t({ en: 'In Progress', mr: 'प्रगतीपथावर' })}</SelectItem>
+                                <SelectItem value="Resolved">{t({ en: 'Resolved', mr: 'निराकरण झाले' })}</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Resolution Photos Section */}
+                    {selectedGrievance?.adminStatus === 'Approved' && selectedGrievance?.progressStatus === 'In-progress' && (
+                      <div className="border-t pt-4">
+                        <h3 className="text-lg font-semibold mb-3">{t({ en: 'Proof of Resolution', mr: 'निराकरणाचा पुरावा' })}</h3>
+                        <div className="space-y-4">
+                          <div className="flex gap-4">
+                            <div>
+                              <Label htmlFor="resolution-photos">{t({ en: 'Upload Resolution Photos', mr: 'निराकरण फोटो अपलोड करा' })}</Label>
+                              <input
+                                id="resolution-photos"
+                                type="file"
+                                accept="image/*"
+                                onChange={handleResolutionUpload}
+                                className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                              />
+                            </div>
+                          </div>
+                          
+                          {resolutionPhotos.length > 0 && (
+                            <div>
+                              <h4 className="font-medium mb-2">{t({ en: 'Uploaded Resolution Photos', mr: 'अपलोड केलेले निराकरण फोटो' })}</h4>
+                              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                {resolutionPhotos.map((photo, index) => (
+                                  <div key={index} className="aspect-square overflow-hidden rounded-lg border">
+                                    <ImageWithFallback 
+                                      src={photo} 
+                                      alt={`Resolution photo ${index + 1}`} 
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                              <Button 
+                                onClick={handleMarkAsResolved}
+                                className="bg-gray-800 hover:bg-gray-900 text-white"
+                              >
+                                <CheckCircle className="h-4 w-4 mr-2" />
+                                {t({ en: 'Mark as Resolved', mr: 'निराकरण चिन्हांकित करा' })}
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Resolution Photos Display */}
+                    {selectedGrievance.resolutionPhotos && selectedGrievance.resolutionPhotos.length > 0 && (
+                      <div className="border-t pt-4">
+                        <h3 className="text-lg font-semibold mb-3">{t({ en: 'Resolution Photos', mr: 'निराकरण फोटो' })}</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {selectedGrievance.resolutionPhotos.map((photo, index) => (
+                            <div key={index} className="aspect-square overflow-hidden rounded-lg border">
+                              <ImageWithFallback 
+                                src={photo} 
+                                alt={`Resolution photo ${index + 1}`} 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Submitted Photos Section */}
+                    {selectedGrievance.photos && selectedGrievance.photos.length > 0 && (
+                      <div className="border-t pt-4">
+                        <h3 className="text-lg font-semibold mb-3">{t({ en: 'Submitted Photos', mr: 'सबमिट केलेले फोटो' })}</h3>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          {selectedGrievance.photos.map((photo, index) => (
+                            <div key={index} className="aspect-square overflow-hidden rounded-lg border">
+                              <ImageWithFallback 
+                                src={photo} 
+                                alt={`Grievance photo ${index + 1}`} 
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                    </div>
+                  </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <p className="text-gray-500">{t({ en: 'Loading grievance details...', mr: 'तक्रार तपशील लोड करत आहे...' })}</p>
+                      </div>
+                    )}
+                
+                <div className="flex justify-end pt-4 border-t mt-4">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setIsDetailModalOpen(false)}
+                  >
+                    {t({ en: 'Close', mr: 'बंद करा' })}
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="committee">
@@ -2643,16 +3597,1461 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
           </TabsContent>
 
           <TabsContent value="news">
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                {t({ en: 'News Management', mr: 'वार्ता व्यवस्थापन' })}
-              </h3>
-              <p className="text-gray-600">
-                {t({ en: 'Manage village news and announcements', mr: 'गाव वार्ता आणि घोषणांचे व्यवस्थापन करा' })}
-              </p>
+            <div className="space-y-6">
+              {/* News Management Header */}
+              <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">{t({ en: 'News Management', mr: 'बातम्या व्यवस्थापन' })}</h2>
+                  <p className="text-gray-600 mt-1">{t({ en: 'Manage village news, announcements, alerts and events', mr: 'गावातील बातम्या, घोषणा, सूचना आणि कार्यक्रम व्यवस्थापित करा' })}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => setIsAddNewsOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t({ en: 'Add News', mr: 'बातमी जोडा' })}
+                  </Button>
+                  <Button onClick={() => {
+                    // CSV Export functionality
+                    const csvContent = [
+                      ['Title (EN)', 'Title (MR)', 'Category', 'Priority', 'Status', 'Featured', 'Breaking', 'Reads', 'Published Date'].join(','),
+                      ...newsItems.map(news => [
+                        `"${news.title?.en || ''}"`,
+                        `"${news.title?.mr || ''}"`,
+                        `"${newsCategories.find(cat => cat._id === news.category)?.name?.en || ''}"`,
+                        `"${news.priority || ''}"`,
+                        `"${news.isPublished ? 'Published' : 'Draft'}"`,
+                        `"${news.isFeatured ? 'Yes' : 'No'}"`,
+                        `"${news.isBreaking ? 'Yes' : 'No'}"`,
+                        `"${news.readCount || 0}"`,
+                        `"${new Date(news.publishDate).toLocaleDateString()}"`
+                      ].join(','))
+                    ].join('\n');
+                    
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const link = document.createElement('a');
+                    const url = URL.createObjectURL(blob);
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `news_export_${new Date().toISOString().split('T')[0]}.csv`);
+                    link.style.visibility = 'hidden';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                  }} variant="outline" className="border-indigo-500 text-indigo-600 hover:bg-indigo-50">
+                    <Download className="h-4 w-4 mr-2" />
+                    {t({ en: 'Export CSV', mr: 'CSV एक्सपोर्ट' })}
+                  </Button>
+                </div>
               </div>
+
+              {/* News Stats Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-indigo-600">{newsStats.articles?.total || 0}</div>
+                    <div className="text-sm text-gray-600">{t({ en: 'Total News', mr: 'एकूण बातम्या' })}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-green-600">{newsStats.articles?.published || 0}</div>
+                    <div className="text-sm text-gray-600">{t({ en: 'Published', mr: 'प्रकाशित' })}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-gray-600">{newsStats.articles?.draft || 0}</div>
+                    <div className="text-sm text-gray-600">{t({ en: 'Draft', mr: 'मसौदा' })}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-purple-600">{newsStats.articles?.featured || 0}</div>
+                    <div className="text-sm text-gray-600">{t({ en: 'Featured', mr: 'विशेष' })}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-red-600">{newsStats.articles?.breaking || 0}</div>
+                    <div className="text-sm text-gray-600">{t({ en: 'Breaking', mr: 'तातडीची' })}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-orange-600">{newsItems.filter(n => n.priority === 'high').length}</div>
+                    <div className="text-sm text-gray-600">{t({ en: 'High Priority', mr: 'उच्च प्राधान्य' })}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-blue-600">{newsItems.reduce((sum, n) => sum + (n.readCount || 0), 0)}</div>
+                    <div className="text-sm text-gray-600">{t({ en: 'Total Reads', mr: 'एकूण वाचन' })}</div>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4 text-center">
+                    <div className="text-2xl font-bold text-teal-600">{upcomingEvents.filter(e => e.isActive).length}</div>
+                    <div className="text-sm text-gray-600">{t({ en: 'Active Events', mr: 'सक्रिय कार्यक्रम' })}</div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="grid md:grid-cols-3 gap-4">
+                <Card className="border-0 shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => setIsEventManagementOpen(true)}>
+                  <CardContent className="p-6 text-center">
+                    <Calendar className="h-12 w-12 mx-auto mb-3 text-blue-600" />
+                    <h3 className="font-bold mb-2">{t({ en: 'Manage Events', mr: 'कार्यक्रम व्यवस्थापन' })}</h3>
+                    <p className="text-sm text-gray-600">{t({ en: 'Add, edit, or remove upcoming events', mr: 'आगामी कार्यक्रम जोडा, संपादित करा किंवा काढा' })}</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => setIsNewsCategoryManagementOpen(true)}>
+                  <CardContent className="p-6 text-center">
+                    <Tag className="h-12 w-12 mx-auto mb-3 text-green-600" />
+                    <h3 className="font-bold mb-2">{t({ en: 'News Categories', mr: 'बातम्या श्रेणी' })}</h3>
+                    <p className="text-sm text-gray-600">{t({ en: 'Manage news categories and types', mr: 'बातम्या श्रेणी आणि प्रकार व्यवस्थापित करा' })}</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg cursor-pointer hover:shadow-xl transition-shadow" onClick={() => setIsWeatherManagementOpen(true)}>
+                  <CardContent className="p-6 text-center">
+                    <AlertTriangle className="h-12 w-12 mx-auto mb-3 text-yellow-600" />
+                    <h3 className="font-bold mb-2">{t({ en: 'Weather Alerts', mr: 'हवामान सूचना' })}</h3>
+                    <p className="text-sm text-gray-600">{t({ en: 'Manage weather alerts and warnings', mr: 'हवामान सूचना आणि चेतावणी व्यवस्थापित करा' })}</p>
+                  </CardContent>
+                </Card>
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-6 text-center">
+                    <Bell className="h-12 w-12 mx-auto mb-3 text-orange-600" />
+                    <h3 className="font-bold mb-2">{t({ en: 'Notification Settings', mr: 'सूचना सेटिंग्ज' })}</h3>
+                    <p className="text-sm text-gray-600">{t({ en: 'Configure notification preferences', mr: 'सूचना प्राथमिकता कॉन्फिगर करा' })}</p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Search and Filter Controls */}
+              <Card className="border-0 shadow-lg">
+                <CardContent className="p-6">
+                  <div className="flex flex-col lg:flex-row gap-4 lg:items-center">
+                    <div className="flex-1">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                        <Input
+                          placeholder={t({ en: 'Search by title, content, tags...', mr: 'शीर्षक, सामग्री, टॅगने शोधा...' })}
+                          value={newsSearchTerm}
+                          onChange={(e) => setNewsSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-2">
+                      <Select value={newsCategoryFilter} onValueChange={setNewsCategoryFilter}>
+                        <SelectTrigger className="w-40"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">{t({ en: 'All Categories', mr: 'सर्व श्रेणी' })}</SelectItem>
+                          {newsCategories.map((category) => (
+                            <SelectItem key={category._id} value={category._id}>
+                              {category.name.en}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Select value={newsPriorityFilter} onValueChange={setNewsPriorityFilter}>
+                        <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">{t({ en: 'All Priority', mr: 'सर्व प्राधान्य' })}</SelectItem>
+                          <SelectItem value="high">{t({ en: 'High', mr: 'उच्च' })}</SelectItem>
+                          <SelectItem value="medium">{t({ en: 'Medium', mr: 'मध्यम' })}</SelectItem>
+                          <SelectItem value="low">{t({ en: 'Low', mr: 'कमी' })}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Select value={newsStatusFilter} onValueChange={setNewsStatusFilter}>
+                        <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">{t({ en: 'All Status', mr: 'सर्व स्थिती' })}</SelectItem>
+                          <SelectItem value="Published">{t({ en: 'Published', mr: 'प्रकाशित' })}</SelectItem>
+                          <SelectItem value="Draft">{t({ en: 'Draft', mr: 'मसौदा' })}</SelectItem>
+                          <SelectItem value="Featured">{t({ en: 'Featured', mr: 'विशेष' })}</SelectItem>
+                          <SelectItem value="Breaking">{t({ en: 'Breaking', mr: 'तातडीची' })}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button variant={newsViewMode === 'grid' ? 'default' : 'outline'} size="sm" onClick={() => setNewsViewMode('grid')}>
+                        <Grid3X3 className="h-4 w-4" />
+                      </Button>
+                      <Button variant={newsViewMode === 'list' ? 'default' : 'outline'} size="sm" onClick={() => setNewsViewMode('list')}>
+                        <List className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* News List */}
+              {newsViewMode === 'grid' ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {paginatedNews.map((news) => (
+                    <Card key={news._id} className="border-0 shadow-lg overflow-hidden group hover:shadow-xl transition-all">
+                      <CardContent className="p-0">
+                        {news.imageUrl && (
+                          <div className="h-48 bg-gray-200 overflow-hidden">
+                            <img src={news.imageUrl} alt={news.title.en} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                          </div>
+                        )}
+                        <div className="p-4">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="secondary" className="text-xs">
+                              {newsCategories.find(cat => cat._id === news.category)?.name?.en || 'News'}
+                            </Badge>
+                            <Badge 
+                              variant={news.priority === 'high' ? 'destructive' : 
+                                       news.priority === 'medium' ? 'default' : 'secondary'}
+                              className="text-xs"
+                            >
+                              {news.priority}
+                            </Badge>
+                            {news.isFeatured && (
+                              <Badge variant="outline" className="text-xs border-purple-200 text-purple-700">
+                                Featured
+                              </Badge>
+                            )}
+                            {news.isBreaking && (
+                              <Badge variant="destructive" className="text-xs">
+                                Breaking
+                              </Badge>
+                            )}
+                          </div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-2 line-clamp-2">
+                            {news.title.en}
+                          </h3>
+                          <p className="text-gray-600 text-sm mb-3 line-clamp-3">
+                            {news.summary.en}
+                          </p>
+                          <div className="flex items-center justify-between text-xs text-gray-500 mb-3">
+                            <span>{new Date(news.publishDate).toLocaleDateString()}</span>
+                            <span>{news.readCount} reads</span>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => {
+                                setSelectedNews(news);
+                                setIsEditNewsOpen(true);
+                              }}
+                              className="flex-1"
+                            >
+                              <Edit className="h-4 w-4 mr-1" />
+                              Edit
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="sm"
+                              onClick={() => handleDeleteNews(news._id)}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                <Card className="border-0 shadow-xl">
+                  <CardContent className="p-0">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>{t({ en: 'Title', mr: 'शीर्षक' })}</TableHead>
+                            <TableHead>{t({ en: 'Category', mr: 'श्रेणी' })}</TableHead>
+                            <TableHead>{t({ en: 'Priority', mr: 'प्राधान्य' })}</TableHead>
+                            <TableHead>{t({ en: 'Date', mr: 'तारीख' })}</TableHead>
+                            <TableHead>{t({ en: 'Status', mr: 'स्थिती' })}</TableHead>
+                            <TableHead>{t({ en: 'Reads', mr: 'वाचन' })}</TableHead>
+                            <TableHead>{t({ en: 'Actions', mr: 'क्रिया' })}</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {paginatedNews.map((news) => (
+                            <TableRow key={news._id} className="hover:bg-gray-50">
+                              <TableCell>
+                                <div>
+                                  <div className="font-medium">{news.title.en}</div>
+                                  <div className="text-sm text-gray-500 line-clamp-1">{news.summary.en}</div>
+                                  <div className="flex gap-1 mt-1">
+                                    {news.isFeatured && (
+                                      <Badge variant="outline" className="text-xs border-purple-200 text-purple-700">
+                                        Featured
+                                      </Badge>
+                                    )}
+                                    {news.isBreaking && (
+                                      <Badge variant="destructive" className="text-xs">
+                                        Breaking
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="secondary" className="text-xs">
+                                  {newsCategories.find(cat => cat._id === news.category)?.name?.en || 'News'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <Badge 
+                                  variant={news.priority === 'high' ? 'destructive' : 
+                                           news.priority === 'medium' ? 'default' : 'secondary'}
+                                  className="text-xs"
+                                >
+                                  {news.priority}
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="text-sm">
+                                  <div>{new Date(news.publishDate).toLocaleDateString()}</div>
+                                  <div className="text-gray-500">{new Date(news.publishDate).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <Badge variant="outline" className="text-xs border-green-200 text-green-700">
+                                  Published
+                                </Badge>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  <Eye className="h-3 w-3" />
+                                  {news.readCount}
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex gap-2">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedNews(news);
+                                      setIsNewsDetailOpen(true);
+                                    }}
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedNews(news);
+                                      setIsEditNewsOpen(true);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="sm"
+                                    onClick={() => handleDeleteNews(news._id)}
+                                    className="text-red-600 hover:text-red-700"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Pagination */}
+              {totalNewsPages > 1 && (
+                <div className="flex justify-center">
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewsCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={newsCurrentPage === 1}
+                    >
+                      <ChevronLeft className="h-4 w-4 mr-1" />
+                      Previous
+                    </Button>
+                    <span className="flex items-center px-3 text-sm text-gray-600">
+                      Page {newsCurrentPage} of {totalNewsPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setNewsCurrentPage(prev => Math.min(prev + 1, totalNewsPages))}
+                      disabled={newsCurrentPage === totalNewsPages}
+                    >
+                      Next
+                      <ChevronRight className="h-4 w-4 ml-1" />
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
           </TabsContent>
         </Tabs>
+
+        {/* News Detail Modal */}
+        <Dialog open={isNewsDetailOpen} onOpenChange={setIsNewsDetailOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle>{t({ en: 'News Article Details', mr: 'लेख तपशील' })}</DialogTitle>
+            
+            {selectedNews && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{selectedNews.title.en}</h3>
+                    {selectedNews.title.mr && (
+                      <h4 className="text-base text-gray-600 mb-2">{selectedNews.title.mr}</h4>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => {
+                        setIsNewsDetailOpen(false);
+                        setIsEditNewsOpen(true);
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={() => setIsNewsDetailOpen(false)}
+                    >
+                      Close
+                    </Button>
+                  </div>
+                </div>
+                
+                {selectedNews.imageUrl && (
+                  <div className="w-full h-64 bg-gray-200 rounded-lg overflow-hidden">
+                    <img 
+                      src={selectedNews.imageUrl} 
+                      alt={selectedNews.title.en} 
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Category</Label>
+                    <p className="text-sm text-gray-600">
+                      {newsCategories.find(cat => cat._id === selectedNews.category)?.name?.en || 'News'}
+                    </p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Priority</Label>
+                    <p className="text-sm text-gray-600">{selectedNews.priority}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Read Count</Label>
+                    <p className="text-sm text-gray-600">{selectedNews.readCount}</p>
+                  </div>
+                </div>
+                
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Summary</Label>
+                  <p className="text-sm text-gray-600 mt-1">{selectedNews.summary.en}</p>
+                  {selectedNews.summary.mr && (
+                    <p className="text-sm text-gray-600 mt-1">{selectedNews.summary.mr}</p>
+                  )}
+                </div>
+                
+                <div>
+                  <Label className="text-sm font-medium text-gray-700">Content</Label>
+                  <div className="mt-2 p-4 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{selectedNews.content.en}</p>
+                    {selectedNews.content.mr && (
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap mt-4">{selectedNews.content.mr}</p>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Published Date</Label>
+                    <p className="text-sm text-gray-600">{new Date(selectedNews.publishDate).toLocaleDateString()}</p>
+                  </div>
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Author</Label>
+                    <p className="text-sm text-gray-600">{selectedNews.author?.name || 'Admin'}</p>
+                  </div>
+                </div>
+                
+                {selectedNews.tags && selectedNews.tags.length > 0 && (
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">Tags</Label>
+                    <div className="flex flex-wrap gap-2 mt-2">
+                      {selectedNews.tags.map((tag, index) => (
+                        <Badge key={index} variant="secondary" className="text-xs">
+                          {tag}
+                        </Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* News Category Management Modal */}
+        <Dialog open={isNewsCategoryManagementOpen} onOpenChange={setIsNewsCategoryManagementOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogTitle>{t({ en: 'Manage News Categories', mr: 'वार्ता वर्ग व्यवस्थापन' })}</DialogTitle>
+            
+            {/* Categories List */}
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {newsCategories.length > 0 ? (
+                newsCategories.map((category) => (
+                  <div key={category._id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-indigo-50 rounded-full">
+                        <Newspaper className="h-4 w-4 text-indigo-600" />
+                      </div>
+                      <div>
+                        <span className="font-medium">{category.name.en}</span>
+                        {category.name.mr && (
+                          <span className="text-gray-500 ml-2">({category.name.mr})</span>
+                        )}
+                      </div>
+                    </div>
+                    <Button 
+                      onClick={() => handleDeleteNewsCategory(category._id)}
+                      variant="destructive"
+                      size="sm"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-8 text-gray-500">
+                  <Newspaper className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="mb-2">No categories created yet</p>
+                  <p className="text-sm">Create your first news category below</p>
+                </div>
+              )}
+            </div>
+            
+            {/* Add Category Form */}
+            <div className="border-t pt-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">{t({ en: 'Add New Category', mr: 'नवीन वर्ग जोडा' })}</h3>
+                {newsCategories.length === 0 && (
+                  <div className="flex gap-2">
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setNewNewsCategory({
+                          label: { en: 'General News', mr: 'सामान्य बातम्या' },
+                          icon: 'Newspaper'
+                        });
+                      }}
+                      className="text-xs"
+                    >
+                      General
+                    </Button>
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setNewNewsCategory({
+                          label: { en: 'Announcements', mr: 'घोषणा' },
+                          icon: 'Megaphone'
+                        });
+                      }}
+                      className="text-xs"
+                    >
+                      Announcements
+                    </Button>
+                    <Button 
+                      type="button"
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setNewNewsCategory({
+                          label: { en: 'Events', mr: 'कार्यक्रम' },
+                          icon: 'Calendar'
+                        });
+                      }}
+                      className="text-xs"
+                    >
+                      Events
+                    </Button>
+                  </div>
+                )}
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Category Name (English)', mr: 'वर्ग नाव (इंग्रजी)' })}</Label>
+                  <Input
+                    value={newNewsCategory.label.en}
+                    onChange={(e) => setNewNewsCategory({
+                      ...newNewsCategory,
+                      label: { ...newNewsCategory.label, en: e.target.value }
+                    })}
+                    placeholder="Enter category name"
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Category Name (Marathi)', mr: 'वर्ग नाव (मराठी)' })}</Label>
+                  <Input
+                    value={newNewsCategory.label.mr}
+                    onChange={(e) => setNewNewsCategory({
+                      ...newNewsCategory,
+                      label: { ...newNewsCategory.label, mr: e.target.value }
+                    })}
+                    placeholder="वर्ग नाव प्रविष्ट करा"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label>{t({ en: 'Icon Name', mr: 'आयकॉन नाव' })}</Label>
+                <Input
+                  value={newNewsCategory.icon}
+                  onChange={(e) => setNewNewsCategory({
+                    ...newNewsCategory,
+                    icon: e.target.value
+                  })}
+                  placeholder="e.g., Newspaper, Calendar, AlertTriangle"
+                />
+              </div>
+              
+              <Button onClick={handleAddNewsCategory} className="w-full">
+                <Plus className="h-4 w-4 mr-2" />
+                {t({ en: 'Add Category', mr: 'वर्ग जोडा' })}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Event Management Modal */}
+        <Dialog open={isEventManagementOpen} onOpenChange={setIsEventManagementOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogTitle>{t({ en: 'Manage Events', mr: 'कार्यक्रम व्यवस्थापन' })}</DialogTitle>
+            
+            {/* Events List */}
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {upcomingEvents.map((event) => (
+                <div key={event._id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-50 rounded-full">
+                      <Calendar className="h-4 w-4 text-green-600" />
+                    </div>
+                    <div>
+                      <span className="font-medium">{event.title.en}</span>
+                      {event.title.mr && (
+                        <span className="text-gray-500 ml-2">({event.title.mr})</span>
+                      )}
+                      <div className="text-sm text-gray-500">
+                        {new Date(event.eventDate).toLocaleDateString()} at {event.eventTime}
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => handleDeleteEvent(event._id)}
+                    variant="destructive"
+                    size="sm"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            
+            {/* Add Event Form */}
+            <div className="border-t pt-4 space-y-4">
+              <h3 className="font-semibold">{t({ en: 'Add New Event', mr: 'नवीन कार्यक्रम जोडा' })}</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Event Title (English)', mr: 'कार्यक्रम शीर्षक (इंग्रजी)' })} *</Label>
+                  <Input
+                    value={newEvent.title.en}
+                    onChange={(e) => setNewEvent({
+                      ...newEvent,
+                      title: { ...newEvent.title, en: e.target.value }
+                    })}
+                    placeholder="Enter event title"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Event Title (Marathi)', mr: 'कार्यक्रम शीर्षक (मराठी)' })} *</Label>
+                  <Input
+                    value={newEvent.title.mr}
+                    onChange={(e) => setNewEvent({
+                      ...newEvent,
+                      title: { ...newEvent.title, mr: e.target.value }
+                    })}
+                    placeholder="कार्यक्रम शीर्षक प्रविष्ट करा"
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Event Date', mr: 'कार्यक्रम तारीख' })} *</Label>
+                  <Input
+                    type="date"
+                    value={newEvent.eventDate}
+                    onChange={(e) => setNewEvent({
+                      ...newEvent,
+                      eventDate: e.target.value
+                    })}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Event Time', mr: 'कार्यक्रम वेळ' })} *</Label>
+                  <Input
+                    type="time"
+                    value={newEvent.eventTime}
+                    onChange={(e) => setNewEvent({
+                      ...newEvent,
+                      eventTime: e.target.value
+                    })}
+                    required
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Location (English)', mr: 'स्थान (इंग्रजी)' })}</Label>
+                  <Input
+                    value={newEvent.location.en}
+                    onChange={(e) => setNewEvent({
+                      ...newEvent,
+                      location: { ...newEvent.location, en: e.target.value }
+                    })}
+                    placeholder="Enter event location"
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Location (Marathi)', mr: 'स्थान (मराठी)' })}</Label>
+                  <Input
+                    value={newEvent.location.mr}
+                    onChange={(e) => setNewEvent({
+                      ...newEvent,
+                      location: { ...newEvent.location, mr: e.target.value }
+                    })}
+                    placeholder="कार्यक्रम स्थान प्रविष्ट करा"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                  <Textarea
+                    value={newEvent.description.en}
+                    onChange={(e) => setNewEvent({
+                      ...newEvent,
+                      description: { ...newEvent.description, en: e.target.value }
+                    })}
+                    placeholder="Enter event description"
+                    rows={3}
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                  <Textarea
+                    value={newEvent.description.mr}
+                    onChange={(e) => setNewEvent({
+                      ...newEvent,
+                      description: { ...newEvent.description, mr: e.target.value }
+                    })}
+                    placeholder="कार्यक्रम वर्णन प्रविष्ट करा"
+                    rows={3}
+                  />
+                </div>
+              </div>
+              
+              <Button onClick={handleAddEvent} className="w-full bg-blue-600 hover:bg-blue-700">
+                <Plus className="h-4 w-4 mr-2" />
+                {t({ en: 'Add Event', mr: 'कार्यक्रम जोडा' })}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Weather Alert Management Modal */}
+        <Dialog open={isWeatherManagementOpen} onOpenChange={setIsWeatherManagementOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogTitle>{t({ en: 'Manage Weather Alerts', mr: 'हवामान सूचना व्यवस्थापन' })}</DialogTitle>
+            
+            {/* Weather Alerts List */}
+            <div className="space-y-3 max-h-60 overflow-y-auto">
+              {weatherAlerts.map((alert) => (
+                <div key={alert._id} className="flex items-center justify-between p-3 border rounded-lg">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-yellow-50 rounded-full">
+                      <AlertTriangle className="h-4 w-4 text-yellow-600" />
+                    </div>
+                    <div>
+                      <span className="font-medium">{alert.title.en}</span>
+                      {alert.title.mr && (
+                        <span className="text-gray-500 ml-2">({alert.title.mr})</span>
+                      )}
+                      <div className="text-sm text-gray-500">
+                        {alert.severity} • {new Date(alert.startDate).toLocaleDateString()} - {new Date(alert.endDate).toLocaleDateString()}
+                      </div>
+                    </div>
+                  </div>
+                  <Button 
+                    onClick={() => handleDeleteWeatherAlert(alert._id)}
+                    variant="destructive"
+                    size="sm"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+            
+            {/* Add Weather Alert Form */}
+            <div className="border-t pt-4 space-y-4">
+              <h3 className="font-semibold">{t({ en: 'Add New Weather Alert', mr: 'नवीन हवामान सूचना जोडा' })}</h3>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Alert Title (English)', mr: 'सूचना शीर्षक (इंग्रजी)' })} *</Label>
+                  <Input
+                    value={newWeatherAlert.title.en}
+                    onChange={(e) => setNewWeatherAlert({
+                      ...newWeatherAlert,
+                      title: { ...newWeatherAlert.title, en: e.target.value }
+                    })}
+                    placeholder="Enter alert title"
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Alert Title (Marathi)', mr: 'सूचना शीर्षक (मराठी)' })} *</Label>
+                  <Input
+                    value={newWeatherAlert.title.mr}
+                    onChange={(e) => setNewWeatherAlert({
+                      ...newWeatherAlert,
+                      title: { ...newWeatherAlert.title, mr: e.target.value }
+                    })}
+                    placeholder="सूचना शीर्षक प्रविष्ट करा"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Alert Message (English)', mr: 'सूचना संदेश (इंग्रजी)' })}</Label>
+                  <Textarea
+                    value={newWeatherAlert.message.en}
+                    onChange={(e) => setNewWeatherAlert({
+                      ...newWeatherAlert,
+                      message: { ...newWeatherAlert.message, en: e.target.value }
+                    })}
+                    placeholder="Enter alert message"
+                    rows={2}
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Alert Message (Marathi)', mr: 'सूचना संदेश (मराठी)' })}</Label>
+                  <Textarea
+                    value={newWeatherAlert.message.mr}
+                    onChange={(e) => setNewWeatherAlert({
+                      ...newWeatherAlert,
+                      message: { ...newWeatherAlert.message, mr: e.target.value }
+                    })}
+                    placeholder="सूचना संदेश प्रविष्ट करा"
+                    rows={2}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <Label>{t({ en: 'Alert Type', mr: 'सूचना प्रकार' })}</Label>
+                  <Select value={newWeatherAlert.alertType} onValueChange={(value) => setNewWeatherAlert({
+                    ...newWeatherAlert,
+                    alertType: value
+                  })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="warning">{t({ en: 'Warning', mr: 'चेतावणी' })}</SelectItem>
+                      <SelectItem value="info">{t({ en: 'Info', mr: 'माहिती' })}</SelectItem>
+                      <SelectItem value="severe">{t({ en: 'Severe', mr: 'गंभीर' })}</SelectItem>
+                      <SelectItem value="advisory">{t({ en: 'Advisory', mr: 'सल्ला' })}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>{t({ en: 'Severity', mr: 'गंभीरता' })}</Label>
+                  <Select value={newWeatherAlert.severity} onValueChange={(value) => setNewWeatherAlert({
+                    ...newWeatherAlert,
+                    severity: value
+                  })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">{t({ en: 'Low', mr: 'कमी' })}</SelectItem>
+                      <SelectItem value="medium">{t({ en: 'Medium', mr: 'मध्यम' })}</SelectItem>
+                      <SelectItem value="high">{t({ en: 'High', mr: 'उच्च' })}</SelectItem>
+                      <SelectItem value="critical">{t({ en: 'Critical', mr: 'गंभीर' })}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label>{t({ en: 'Icon', mr: 'आयकॉन' })}</Label>
+                  <Select value={newWeatherAlert.icon} onValueChange={(value) => setNewWeatherAlert({
+                    ...newWeatherAlert,
+                    icon: value
+                  })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="AlertTriangle">Warning</SelectItem>
+                      <SelectItem value="CloudRain">Rain</SelectItem>
+                      <SelectItem value="Sun">Sun</SelectItem>
+                      <SelectItem value="Cloud">Cloud</SelectItem>
+                      <SelectItem value="Zap">Lightning</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Start Date', mr: 'प्रारंभ तारीख' })} *</Label>
+                  <Input
+                    type="date"
+                    value={newWeatherAlert.startDate}
+                    onChange={(e) => setNewWeatherAlert({
+                      ...newWeatherAlert,
+                      startDate: e.target.value
+                    })}
+                    required
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'End Date', mr: 'समाप्ती तारीख' })} *</Label>
+                  <Input
+                    type="date"
+                    value={newWeatherAlert.endDate}
+                    onChange={(e) => setNewWeatherAlert({
+                      ...newWeatherAlert,
+                      endDate: e.target.value
+                    })}
+                    required
+                  />
+                </div>
+              </div>
+              
+              <Button onClick={handleAddWeatherAlert} className="w-full bg-blue-600 hover:bg-blue-700">
+                <Plus className="h-4 w-4 mr-2" />
+                {t({ en: 'Add Weather Alert', mr: 'हवामान सूचना जोडा' })}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add News Article Modal */}
+        <Dialog open={isAddNewsOpen} onOpenChange={setIsAddNewsOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle>{t({ en: 'Add News Article', mr: 'नवीन लेख जोडा' })}</DialogTitle>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })} *</Label>
+                  <Input
+                    value={newNewsItem.title.en}
+                    onChange={(e) => setNewNewsItem({
+                      ...newNewsItem,
+                      title: { ...newNewsItem.title, en: e.target.value }
+                    })}
+                    placeholder="Enter article title"
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</Label>
+                  <Input
+                    value={newNewsItem.title.mr}
+                    onChange={(e) => setNewNewsItem({
+                      ...newNewsItem,
+                      title: { ...newNewsItem.title, mr: e.target.value }
+                    })}
+                    placeholder="लेख शीर्षक प्रविष्ट करा"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Summary (English)', mr: 'सारांश (इंग्रजी)' })}</Label>
+                  <Textarea
+                    value={newNewsItem.summary.en}
+                    onChange={(e) => setNewNewsItem({
+                      ...newNewsItem,
+                      summary: { ...newNewsItem.summary, en: e.target.value }
+                    })}
+                    placeholder="Enter article summary"
+                    rows={3}
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Summary (Marathi)', mr: 'सारांश (मराठी)' })}</Label>
+                  <Textarea
+                    value={newNewsItem.summary.mr}
+                    onChange={(e) => setNewNewsItem({
+                      ...newNewsItem,
+                      summary: { ...newNewsItem.summary, mr: e.target.value }
+                    })}
+                    placeholder="लेख सारांश प्रविष्ट करा"
+                    rows={3}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>{t({ en: 'Content (English)', mr: 'सामग्री (इंग्रजी)' })} *</Label>
+                  <Textarea
+                    value={newNewsItem.content.en}
+                    onChange={(e) => setNewNewsItem({
+                      ...newNewsItem,
+                      content: { ...newNewsItem.content, en: e.target.value }
+                    })}
+                    placeholder="Enter article content"
+                    rows={5}
+                  />
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Content (Marathi)', mr: 'सामग्री (मराठी)' })}</Label>
+                  <Textarea
+                    value={newNewsItem.content.mr}
+                    onChange={(e) => setNewNewsItem({
+                      ...newNewsItem,
+                      content: { ...newNewsItem.content, mr: e.target.value }
+                    })}
+                    placeholder="लेख सामग्री प्रविष्ट करा"
+                    rows={5}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <Label>{t({ en: 'Category', mr: 'वर्ग' })} *</Label>
+                    {newsCategories.length === 0 && (
+                      <Button 
+                        type="button"
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setIsAddNewsOpen(false);
+                          setIsNewsCategoryManagementOpen(true);
+                        }}
+                        className="text-xs"
+                      >
+                        <Plus className="h-3 w-3 mr-1" />
+                        Create Category
+                      </Button>
+                    )}
+                  </div>
+                  <Select value={newNewsItem.category} onValueChange={(value) => setNewNewsItem({
+                    ...newNewsItem,
+                    category: value
+                  })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder={newsCategories.length === 0 ? "No categories - Create one first" : "Select category"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {newsCategories.length > 0 ? (
+                        newsCategories.map((category) => (
+                          <SelectItem key={category._id} value={category._id}>
+                            {category.name.en}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value="no-categories" disabled>
+                          No categories available - Click "Create Category" button above
+                        </SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Priority', mr: 'प्राधान्य' })}</Label>
+                  <Select value={newNewsItem.priority} onValueChange={(value) => setNewNewsItem({
+                    ...newNewsItem,
+                    priority: value
+                  })}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">{t({ en: 'Low', mr: 'कमी' })}</SelectItem>
+                      <SelectItem value="medium">{t({ en: 'Medium', mr: 'मध्यम' })}</SelectItem>
+                      <SelectItem value="high">{t({ en: 'High', mr: 'उच्च' })}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label>{t({ en: 'Image', mr: 'छायाचित्र' })}</Label>
+                  <div className="space-y-2">
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          // Compress and convert to base64
+                          const reader = new FileReader();
+                          reader.onload = (event) => {
+                            const result = event.target?.result as string;
+                            setNewNewsItem({
+                              ...newNewsItem,
+                              image: result
+                            });
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                    />
+                    <Input
+                      value={newNewsItem.image}
+                      onChange={(e) => setNewNewsItem({
+                        ...newNewsItem,
+                        image: e.target.value
+                      })}
+                      placeholder="Or paste image URL here..."
+                      className="text-sm"
+                    />
+                    {newNewsItem.image && (
+                      <div className="mt-2">
+                        <img 
+                          src={newNewsItem.image} 
+                          alt="Preview" 
+                          className="w-20 h-20 object-cover rounded border"
+                        />
+                        <p className="text-xs text-gray-500 mt-1">Image preview</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="featured"
+                    checked={newNewsItem.isFeatured}
+                    onChange={(e) => setNewNewsItem({
+                      ...newNewsItem,
+                      isFeatured: e.target.checked
+                    })}
+                  />
+                  <Label htmlFor="featured">{t({ en: 'Featured Article', mr: 'विशेष लेख' })}</Label>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="breaking"
+                    checked={newNewsItem.isBreaking}
+                    onChange={(e) => setNewNewsItem({
+                      ...newNewsItem,
+                      isBreaking: e.target.checked
+                    })}
+                  />
+                  <Label htmlFor="breaking">{t({ en: 'Breaking News', mr: 'तातडीची बातमी' })}</Label>
+                </div>
+              </div>
+              
+              <div className="flex justify-end gap-2">
+                <Button variant="outline" onClick={() => setIsAddNewsOpen(false)}>
+                  {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                </Button>
+                <Button onClick={handleAddNews} className="bg-indigo-600 hover:bg-indigo-700">
+                  {t({ en: 'Create Article', mr: 'लेख तयार करा' })}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit News Article Modal */}
+        <Dialog open={isEditNewsOpen} onOpenChange={setIsEditNewsOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle>{t({ en: 'Edit News Article', mr: 'लेख संपादित करा' })}</DialogTitle>
+            
+            {selectedNews && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })} *</Label>
+                    <Input
+                      value={selectedNews.title?.en || ''}
+                      onChange={(e) => setSelectedNews({
+                        ...selectedNews,
+                        title: { ...selectedNews.title, en: e.target.value }
+                      })}
+                      placeholder="Enter article title"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</Label>
+                    <Input
+                      value={selectedNews.title?.mr || ''}
+                      onChange={(e) => setSelectedNews({
+                        ...selectedNews,
+                        title: { ...selectedNews.title, mr: e.target.value }
+                      })}
+                      placeholder="लेख शीर्षक प्रविष्ट करा"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t({ en: 'Summary (English)', mr: 'सारांश (इंग्रजी)' })}</Label>
+                    <Textarea
+                      value={selectedNews.summary?.en || ''}
+                      onChange={(e) => setSelectedNews({
+                        ...selectedNews,
+                        summary: { ...selectedNews.summary, en: e.target.value }
+                      })}
+                      placeholder="Enter article summary"
+                      rows={3}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>{t({ en: 'Summary (Marathi)', mr: 'सारांश (मराठी)' })}</Label>
+                    <Textarea
+                      value={selectedNews.summary?.mr || ''}
+                      onChange={(e) => setSelectedNews({
+                        ...selectedNews,
+                        summary: { ...selectedNews.summary, mr: e.target.value }
+                      })}
+                      placeholder="लेख सारांश प्रविष्ट करा"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t({ en: 'Content (English)', mr: 'सामग्री (इंग्रजी)' })} *</Label>
+                    <Textarea
+                      value={selectedNews.content?.en || ''}
+                      onChange={(e) => setSelectedNews({
+                        ...selectedNews,
+                        content: { ...selectedNews.content, en: e.target.value }
+                      })}
+                      placeholder="Enter article content"
+                      rows={5}
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label>{t({ en: 'Content (Marathi)', mr: 'सामग्री (मराठी)' })}</Label>
+                    <Textarea
+                      value={selectedNews.content?.mr || ''}
+                      onChange={(e) => setSelectedNews({
+                        ...selectedNews,
+                        content: { ...selectedNews.content, mr: e.target.value }
+                      })}
+                      placeholder="लेख सामग्री प्रविष्ट करा"
+                      rows={5}
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <Label>{t({ en: 'Category', mr: 'वर्ग' })} *</Label>
+                      {newsCategories.length === 0 && (
+                        <Button 
+                          type="button"
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => {
+                            setIsEditNewsOpen(false);
+                            setIsNewsCategoryManagementOpen(true);
+                          }}
+                          className="text-xs"
+                        >
+                          <Plus className="h-3 w-3 mr-1" />
+                          Create Category
+                        </Button>
+                      )}
+                    </div>
+                    <Select value={selectedNews.category} onValueChange={(value) => setSelectedNews({
+                      ...selectedNews,
+                      category: value
+                    })}>
+                      <SelectTrigger>
+                        <SelectValue placeholder={newsCategories.length === 0 ? "No categories - Create one first" : "Select category"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {newsCategories.length > 0 ? (
+                          newsCategories.map((category) => (
+                            <SelectItem key={category._id} value={category._id}>
+                              {category.name.en}
+                            </SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="no-categories" disabled>
+                            No categories available - Click "Create Category" button above
+                          </SelectItem>
+                        )}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>{t({ en: 'Priority', mr: 'प्राधान्य' })}</Label>
+                    <Select value={selectedNews.priority} onValueChange={(value) => setSelectedNews({
+                      ...selectedNews,
+                      priority: value
+                    })}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="low">{t({ en: 'Low', mr: 'कमी' })}</SelectItem>
+                        <SelectItem value="medium">{t({ en: 'Medium', mr: 'मध्यम' })}</SelectItem>
+                        <SelectItem value="high">{t({ en: 'High', mr: 'उच्च' })}</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label>{t({ en: 'Image', mr: 'छायाचित्र' })}</Label>
+                    <div className="space-y-2">
+                      <Input
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            // Compress and convert to base64
+                            const reader = new FileReader();
+                            reader.onload = (event) => {
+                              const result = event.target?.result as string;
+                              setSelectedNews({
+                                ...selectedNews,
+                                imageUrl: result
+                              });
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        className="file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+                      />
+                      <Input
+                        value={selectedNews.imageUrl || ''}
+                        onChange={(e) => setSelectedNews({
+                          ...selectedNews,
+                          imageUrl: e.target.value
+                        })}
+                        placeholder="Or paste image URL here..."
+                        className="text-sm"
+                      />
+                      {selectedNews.imageUrl && (
+                        <div className="mt-2">
+                          <img 
+                            src={selectedNews.imageUrl} 
+                            alt="Preview" 
+                            className="w-20 h-20 object-cover rounded border"
+                          />
+                          <p className="text-xs text-gray-500 mt-1">Image preview</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="edit-featured"
+                      checked={selectedNews.isFeatured || false}
+                      onChange={(e) => setSelectedNews({
+                        ...selectedNews,
+                        isFeatured: e.target.checked
+                      })}
+                    />
+                    <Label htmlFor="edit-featured">{t({ en: 'Featured Article', mr: 'विशेष लेख' })}</Label>
+                  </div>
+                  
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="edit-breaking"
+                      checked={selectedNews.isBreaking || false}
+                      onChange={(e) => setSelectedNews({
+                        ...selectedNews,
+                        isBreaking: e.target.checked
+                      })}
+                    />
+                    <Label htmlFor="edit-breaking">{t({ en: 'Breaking News', mr: 'तातडीची बातमी' })}</Label>
+                  </div>
+                </div>
+                
+                <div className="flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => setIsEditNewsOpen(false)}>
+                    {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                  </Button>
+                  <Button onClick={handleUpdateNews} className="bg-indigo-600 hover:bg-indigo-700">
+                    {t({ en: 'Save Changes', mr: 'बदल जतन करा' })}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
               </div>
     </div>
   );
