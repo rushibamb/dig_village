@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { adminGetAllMediaItems, adminGetAllMediaCategories, adminCreateMediaItem, adminUpdateMediaItem, adminDeleteMediaItem, adminCreateMediaCategory, adminDeleteMediaCategory } from '../services/mediaService';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -54,6 +55,18 @@ import {
   adminDeleteWeatherAlert,
   adminGetWeatherAlertStats
 } from '../services/newsService';
+import {
+  adminGetAllCommitteeMembers,
+  adminGetAllDepartments,
+  adminGetOfficeInfo,
+  adminCreateCommitteeMember,
+  adminUpdateCommitteeMember,
+  adminDeleteCommitteeMember,
+  adminCreateDepartment,
+  adminUpdateDepartment,
+  adminDeleteDepartment,
+  adminUpdateOfficeInfo
+} from '../services/committeeService';
 
 import { formatDateForAPI } from '../utils/dateUtils';
 import { toast } from 'sonner';
@@ -63,8 +76,6 @@ import {
   Plus,
   Edit,
   Trash2,
-  Save,
-  X,
   Home,
   CreditCard,
   ArrowLeft,
@@ -92,6 +103,7 @@ import {
   Camera,
   Video,
   Image,
+  Folder,
   Play,
   Grid3X3,
   List,
@@ -110,9 +122,15 @@ import {
   TrendingUp,
   Target,
   Building,
+  Building2,
+  Award,
+  Users,
   Badge as BadgeIcon,
   Calendar as CalendarIcon,
-  Clock as ClockIcon
+  Clock as ClockIcon,
+  X,
+  Check,
+  Save
 } from 'lucide-react';
 
 export function AdminPage() {
@@ -134,6 +152,37 @@ export function AdminPage() {
   const [grievances, setGrievances] = useState([]);
   const [workers, setWorkers] = useState([]);
   const [grievanceLoading, setGrievanceLoading] = useState(true);
+
+  // Media management states
+  const [mediaItems, setMediaItems] = useState([]);
+  const [mediaCategories, setMediaCategories] = useState([]);
+  const [isAddMediaOpen, setIsAddMediaOpen] = useState(false);
+  const [isEditMediaOpen, setIsEditMediaOpen] = useState(false);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [newMediaItem, setNewMediaItem] = useState({
+    mediaType: 'Photo',
+    title: { en: '', mr: '' },
+    description: { en: '', mr: '' },
+    category: '',
+    tags: [],
+    fileUrl: '',
+    thumbnailUrl: '',
+    isFeatured: false
+  });
+  
+  // Media filtering and pagination states
+  const [mediaSearchTerm, setMediaSearchTerm] = useState('');
+  const [mediaTypeFilter, setMediaTypeFilter] = useState('All');
+  const [mediaCategoryFilter, setMediaCategoryFilter] = useState('All');
+  const [mediaStatusFilter, setMediaStatusFilter] = useState('All');
+  const [mediaCurrentPage, setMediaCurrentPage] = useState(1);
+  
+  // Category management states
+  const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [newMediaCategory, setNewMediaCategory] = useState({
+    name: { en: '', mr: '' }
+  });
 
   // Worker management states
   const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false);
@@ -172,7 +221,7 @@ export function AdminPage() {
   const fetchVillagers = async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params: any = {};
       if (searchTerm) params.search = searchTerm;
       if (statusFilter && statusFilter !== 'all') params.status = statusFilter;
       
@@ -216,6 +265,213 @@ export function AdminPage() {
     }
   };
 
+  // Reusable function to fetch media items
+  const fetchMediaItems = async () => {
+    try {
+      const mediaRes = await adminGetAllMediaItems();
+      setMediaItems(mediaRes.data);
+    } catch (error) {
+      console.error("Failed to fetch media items:", error);
+    }
+  };
+
+  // Reusable function to fetch media categories
+  const fetchMediaCategories = async () => {
+    try {
+      const categoriesRes = await adminGetAllMediaCategories();
+      setMediaCategories(categoriesRes.data);
+    } catch (error) {
+      console.error("Failed to fetch media categories:", error);
+    }
+  };
+
+  // File upload handler for server-side Cloudinary upload
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    setUploading(true);
+    
+    try {
+      // Check if file is too large (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error('File size too large. Please select a file smaller than 10MB.');
+        setUploading(false);
+        return;
+      }
+      
+      // Create FormData for file upload
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      // Upload to server endpoint
+      const response = await fetch('/api/upload/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: formData
+      });
+      
+      if (!response.ok) {
+        throw new Error('Upload failed');
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        setNewMediaItem(prev => ({
+          ...prev,
+          fileUrl: result.data.fileUrl,
+          thumbnailUrl: result.data.thumbnailUrl
+        }));
+        
+        toast.success('File uploaded successfully to Cloudinary!');
+      } else {
+        throw new Error(result.message || 'Upload failed');
+      }
+      
+    } catch (error) {
+      console.error('Upload error:', error);
+      
+      // Fallback to a working placeholder URL
+      const placeholderUrl = 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=800&h=600&fit=crop';
+      
+      setNewMediaItem(prev => ({
+        ...prev,
+        fileUrl: placeholderUrl,
+        thumbnailUrl: placeholderUrl
+      }));
+      
+      toast.error('Upload failed. Using placeholder image.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  // Form submit handler for adding new media
+  const handleAddMediaSubmit = async () => {
+    try {
+      // Validate required fields
+      if (!newMediaItem.title.en || !newMediaItem.category || !newMediaItem.fileUrl) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      await adminCreateMediaItem(newMediaItem);
+      
+      // Reset form
+      setNewMediaItem({
+        mediaType: 'Photo',
+        title: { en: '', mr: '' },
+        description: { en: '', mr: '' },
+        category: '',
+        tags: [],
+        fileUrl: '',
+        thumbnailUrl: '',
+        isFeatured: false
+      });
+      
+      // Close modal
+      setIsAddMediaOpen(false);
+      
+      // Refresh media list
+      await fetchMediaItems();
+      
+      toast.success('Media item added successfully');
+    } catch (error) {
+      console.error('Failed to add media item:', error);
+      toast.error('Failed to add media item');
+    }
+  };
+
+  // Update media item handler
+  const handleUpdateMedia = async () => {
+    try {
+      if (!selectedMedia) return;
+
+      // Validate required fields
+      if (!selectedMedia.title.en || !selectedMedia.category) {
+        toast.error('Please fill in all required fields');
+        return;
+      }
+
+      await adminUpdateMediaItem(selectedMedia._id, selectedMedia);
+      
+      // Close modal
+      setIsEditMediaOpen(false);
+      setSelectedMedia(null);
+      
+      // Refresh media list
+      await fetchMediaItems();
+      
+      toast.success('Media item updated successfully');
+    } catch (error) {
+      console.error('Failed to update media item:', error);
+      toast.error('Failed to update media item');
+    }
+  };
+
+  // Delete media item handler
+  const handleDeleteMediaItem = async (mediaId) => {
+    if (window.confirm('Are you sure you want to delete this media item?')) {
+      try {
+        await adminDeleteMediaItem(mediaId);
+        
+        // Refresh media list
+        await fetchMediaItems();
+        
+        toast.success('Media item deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete media item:', error);
+        toast.error('Failed to delete media item');
+      }
+    }
+  };
+
+  // Add category handler
+  const handleAddCategory = async () => {
+    try {
+      // Validate required fields
+      if (!newMediaCategory.name.en || !newMediaCategory.name.mr) {
+        toast.error('Please fill in both English and Marathi names');
+        return;
+      }
+
+      await adminCreateMediaCategory(newMediaCategory);
+      
+      // Reset form
+      setNewMediaCategory({
+        name: { en: '', mr: '' }
+      });
+      
+      // Refresh categories list
+      await fetchMediaCategories();
+      
+      toast.success('Category added successfully');
+    } catch (error) {
+      console.error('Failed to add category:', error);
+      toast.error('Failed to add category');
+    }
+  };
+
+  // Delete category handler
+  const handleDeleteCategory = async (categoryId) => {
+    if (window.confirm('Are you sure you want to delete this category? This will also delete all media items in this category.')) {
+      try {
+        await adminDeleteMediaCategory(categoryId);
+        
+        // Refresh categories list
+        await fetchMediaCategories();
+        
+        toast.success('Category deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete category:', error);
+        toast.error('Failed to delete category');
+      }
+    }
+  };
+
   // Reusable function to fetch news data
   const fetchNewsData = async () => {
     try {
@@ -256,7 +512,45 @@ export function AdminPage() {
   };
 
 
-  // Fetch grievance, worker, and news data on component mount
+  // Fetch committee members
+  const fetchCommitteeMembers = async () => {
+    try {
+      const committeeMembersRes = await adminGetAllCommitteeMembers();
+      setCommitteeMembers(committeeMembersRes.data || []);
+    } catch (error) {
+      console.error('Failed to fetch committee members:', error);
+      toast.error('Failed to load committee members');
+    }
+  };
+
+  // Fetch departments
+  const fetchDepartments = async () => {
+    try {
+      const departmentsRes = await adminGetAllDepartments();
+      setDepartments(departmentsRes.data || []);
+    } catch (error) {
+      console.error('Failed to fetch departments:', error);
+      toast.error('Failed to load departments');
+    }
+  };
+
+  // Fetch office information
+  const fetchOfficeInfo = async () => {
+    try {
+      const officeInfoRes = await adminGetOfficeInfo();
+      setOfficeInfo(officeInfoRes.data || {});
+      
+      // Set office hours if available in office info
+      if (officeInfoRes.data?.officeHours) {
+        setOfficeHours(officeInfoRes.data.officeHours);
+      }
+    } catch (error) {
+      console.error('Failed to fetch office info:', error);
+      toast.error('Failed to load office information');
+    }
+  };
+
+  // Fetch grievance, worker, news, and media data on component mount
   useEffect(() => {
     const fetchInitialData = async () => {
       await Promise.all([
@@ -265,7 +559,12 @@ export function AdminPage() {
         fetchNewsData(),
         fetchCategories(),
         fetchEvents(),
-        fetchWeatherAlerts()
+        fetchWeatherAlerts(),
+        fetchCommitteeMembers(),
+        fetchDepartments(),
+        fetchOfficeInfo(),
+        fetchMediaItems(),
+        fetchMediaCategories()
       ]);
     };
     fetchInitialData();
@@ -879,99 +1178,13 @@ export function AdminPage() {
   });
 
   // Committee management states
-  const [committeeMembers, setCommitteeMembers] = useState([
-    {
-      id: 1,
-      name: { en: 'Smt. Sunita Devi', mr: 'श्रीमती सुनीता देवी' },
-      position: { en: 'Sarpanch (Village Head)', mr: 'सरपंच (गाव प्रमुख)' },
-      ward: 'All Wards',
-      phone: '+91 9876543210',
-      email: 'sarpanch.rampur@gov.in',
-      experience: { en: '8 years in local governance', mr: '८ वर्षांचा स्थानिक प्रशासनाचा अनुभव' },
-      education: { en: 'B.A., Diploma in Rural Development', mr: 'बी.ए., ग्रामीण विकास डिप्लोमा' },
-      achievements: [
-        { en: 'Village Development Award 2022', mr: 'गाव विकास पुरस्कार २०२२' },
-        { en: 'Digital Village Initiative', mr: 'डिजिटल व्हिलेज इनिशिएटिव्ह' }
-      ],
-      photo: 'https://images.unsplash.com/photo-1667564790635-0f560121359e',
-      color: 'bg-purple-500',
-      isActive: true,
-      joinDate: '2020-01-15',
-      termEnd: '2025-01-15'
-    },
-    {
-      id: 2,
-      name: { en: 'Shri Ram Kumar Sharma', mr: 'श्री राम कुमार शर्मा' },
-      position: { en: 'Deputy Sarpanch', mr: 'उप सरपंच' },
-      ward: 'Ward 1 & 2',
-      phone: '+91 9876543211',
-      email: 'deputy.rampur@gov.in',
-      experience: { en: '5 years in village administration', mr: '५ वर्षांचा गाव प्रशासनाचा अनुभव' },
-      education: { en: 'B.Com, Rural Management Certificate', mr: 'बी.कॉम, ग्रामीण व्यवस्थापन प्रमाणपत्र' },
-      achievements: [
-        { en: 'Water Conservation Project', mr: 'जल संधारण प्रकल्प' },
-        { en: 'Best Ward Development 2023', mr: 'सर्वोत्तम वार्ड विकास २०२३' }
-      ],
-      photo: null,
-      color: 'bg-blue-500',
-      isActive: true,
-      joinDate: '2021-06-10',
-      termEnd: '2025-06-10'
-    }
-  ]);
+  const [committeeMembers, setCommitteeMembers] = useState([]);
 
-  const [departments, setDepartments] = useState([
-    {
-      id: 1,
-      name: { en: 'Revenue Department', mr: 'महसूल विभाग' },
-      head: { en: 'Shri Anil Khade', mr: 'श्री अनिल खडे' },
-      phone: '+91 9876543215',
-      email: 'revenue.rampur@gov.in',
-      services: [
-        { en: 'Land Records', mr: 'जमीन नोंदी' },
-        { en: 'Property Tax', mr: 'मालमत्ता कर' },
-        { en: 'Revenue Certificates', mr: 'महसूल प्रमाणपत्रे' }
-      ],
-      isActive: true
-    },
-    {
-      id: 2,
-      name: { en: 'Development Department', mr: 'विकास विभाग' },
-      head: { en: 'Smt. Priya Kulkarni', mr: 'श्रीमती प्रिया कुलकर्णी' },
-      phone: '+91 9876543216',
-      email: 'development.rampur@gov.in',
-      services: [
-        { en: 'Infrastructure Projects', mr: 'पायाभूत सुविधा प्रकल्प' },
-        { en: 'Road Maintenance', mr: 'रस्ता देखभाल' },
-        { en: 'Public Facilities', mr: 'सार्वजनिक सुविधा' }
-      ],
-      isActive: true
-    }
-  ]);
+  const [departments, setDepartments] = useState([]);
 
-  const [officeInfo, setOfficeInfo] = useState({
-    address: {
-      en: 'Village Panchayat Building\nMain Road, Rampur\nTaluka: Pune, District: Pune\nMaharashtra - 412345',
-      mr: 'ग्राम पंचायत इमारत\nमुख्य रस्ता, रामपूर\nतालुका: पुणे, जिल्हा: पुणे\nमहाराष्ट्र - ४१२३४५'
-    },
-    phone: '+91 20 1234 5678',
-    email: 'office.rampur@gov.in',
-    emergencyContact: '+91 9876543210',
-    publicMeeting: {
-      en: 'Every first Monday of the month at 10:00 AM',
-      mr: 'दर महिन्याच्या पहिल्या सोमवारी सकाळी १०:०० वाजता'
-    }
-  });
+  const [officeInfo, setOfficeInfo] = useState({});
 
-  const [officeHours, setOfficeHours] = useState([
-    { day: { en: 'Monday', mr: 'सोमवार' }, hours: '9:00 AM - 5:00 PM', available: true },
-    { day: { en: 'Tuesday', mr: 'मंगळवार' }, hours: '9:00 AM - 5:00 PM', available: true },
-    { day: { en: 'Wednesday', mr: 'बुधवार' }, hours: '9:00 AM - 5:00 PM', available: true },
-    { day: { en: 'Thursday', mr: 'गुरुवार' }, hours: '9:00 AM - 5:00 PM', available: true },
-    { day: { en: 'Friday', mr: 'शुक्रवार' }, hours: '9:00 AM - 5:00 PM', available: true },
-    { day: { en: 'Saturday', mr: 'शनिवार' }, hours: '9:00 AM - 1:00 PM', available: true },
-    { day: { en: 'Sunday', mr: 'रविवार' }, hours: 'Closed', available: false }
-  ]);
+  const [officeHours, setOfficeHours] = useState([]);
 
   // Committee management UI states
   const [selectedCommitteeMember, setSelectedCommitteeMember] = useState(null);
@@ -981,6 +1194,7 @@ export function AdminPage() {
   const [isDepartmentManagementOpen, setIsDepartmentManagementOpen] = useState(false);
   const [isAddDepartmentOpen, setIsAddDepartmentOpen] = useState(false);
   const [isOfficeInfoEditOpen, setIsOfficeInfoEditOpen] = useState(false);
+  const [isOfficeHoursEditOpen, setIsOfficeHoursEditOpen] = useState(false);
   const [selectedDepartment, setSelectedDepartment] = useState(null);
   const [newCommitteeMember, setNewCommitteeMember] = useState({
     name: { en: '', mr: '' },
@@ -1004,102 +1218,6 @@ export function AdminPage() {
     services: []
   });
 
-  // Media management states
-  const [mediaItems, setMediaItems] = useState([
-    {
-      id: 1,
-      type: 'photo',
-      title: { en: 'Ganesh Festival Celebration', mr: 'गणेश उत्सव साजरा' },
-      description: { en: 'Annual Ganesh festival celebrated with great enthusiasm', mr: 'वार्षिक गणेश उत्सव मोठ्या उत्साहाने साजरा केला' },
-      url: 'https://images.unsplash.com/photo-1745988583865-2249654d864c',
-      thumbnail: 'https://images.unsplash.com/photo-1745988583865-2249654d864c',
-      category: 'festivals',
-      tags: ['festival', 'ganesh', 'celebration'],
-      date: '2024-08-25',
-      uploadDate: '2024-08-26',
-      views: 245,
-      likes: 32,
-      fileSize: '2.3 MB',
-      dimensions: '1920x1080',
-      isActive: true,
-      isFeatured: true,
-      uploadedBy: 'admin'
-    },
-    {
-      id: 2,
-      type: 'photo',
-      title: { en: 'New Road Construction', mr: 'नवीन रस्ता बांधकाम' },
-      description: { en: 'Construction of new concrete road connecting to main highway', mr: 'मुख्य महामार्गाला जोडणारा नवीन काँक्रीट रस्ता बांधकाम' },
-      url: 'https://images.unsplash.com/photo-1683633570715-dce2fd5dfe90',
-      thumbnail: 'https://images.unsplash.com/photo-1683633570715-dce2fd5dfe90',
-      category: 'development',
-      tags: ['development', 'road', 'construction'],
-      date: '2024-07-15',
-      uploadDate: '2024-07-16',
-      views: 189,
-      likes: 28,
-      fileSize: '1.8 MB',
-      dimensions: '1920x1080',
-      isActive: true,
-      isFeatured: false,
-      uploadedBy: 'admin'
-    },
-    {
-      id: 3,
-      type: 'video',
-      title: { en: 'Village Development Documentary', mr: 'गाव विकास माहितीपट' },
-      description: { en: '10-minute documentary showcasing village transformation', mr: 'गावातील परिवर्तन दाखवणारा १० मिनिटांचा माहितीपट' },
-      url: 'https://example.com/video1.mp4',
-      thumbnail: 'https://images.unsplash.com/photo-1683633570715-dce2fd5dfe90',
-      category: 'development',
-      tags: ['documentary', 'development', 'transformation'],
-      date: '2024-07-20',
-      uploadDate: '2024-07-21',
-      views: 1240,
-      likes: 89,
-      duration: '10:23',
-      fileSize: '85.4 MB',
-      resolution: '1920x1080',
-      isActive: true,
-      isFeatured: true,
-      uploadedBy: 'admin'
-    }
-  ]);
-
-  const [mediaCategories, setMediaCategories] = useState([
-    { id: 'festivals', label: { en: 'Festivals', mr: 'सण-उत्सव' }, count: 15 },
-    { id: 'development', label: { en: 'Development', mr: 'विकास' }, count: 12 },
-    { id: 'education', label: { en: 'Education', mr: 'शिक्षण' }, count: 8 },
-    { id: 'agriculture', label: { en: 'Agriculture', mr: 'शेती' }, count: 10 },
-    { id: 'events', label: { en: 'Events', mr: 'कार्यक्रम' }, count: 3 }
-  ]);
-
-  // Media management UI states
-  const [mediaSearchTerm, setMediaSearchTerm] = useState('');
-  const [mediaTypeFilter, setMediaTypeFilter] = useState('All');
-  const [mediaCategoryFilter, setMediaCategoryFilter] = useState('All');
-  const [mediaStatusFilter, setMediaStatusFilter] = useState('All');
-  const [mediaCurrentPage, setMediaCurrentPage] = useState(1);
-  const [selectedMedia, setSelectedMedia] = useState(null);
-  const [isMediaDetailOpen, setIsMediaDetailOpen] = useState(false);
-  const [isAddMediaOpen, setIsAddMediaOpen] = useState(false);
-  const [isEditMediaOpen, setIsEditMediaOpen] = useState(false);
-  const [isCategoryManagementOpen, setIsCategoryManagementOpen] = useState(false);
-  const [isAddCategoryOpen, setIsAddCategoryOpen] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState(null);
-  const [mediaViewMode, setMediaViewMode] = useState('grid');
-  const [newMediaItem, setNewMediaItem] = useState({
-    type: 'photo',
-    title: { en: '', mr: '' },
-    description: { en: '', mr: '' },
-    category: '',
-    tags: [],
-    file: null,
-    isFeatured: false
-  });
-  const [newMediaCategory, setNewMediaCategory] = useState({
-    label: { en: '', mr: '' }
-  });
 
   // News management states
   const [newsItems, setNewsItems] = useState([]);
@@ -1314,7 +1432,7 @@ export function AdminPage() {
     );
   };
 
-  const handleFileUpload = (event) => {
+  const handleTaxFileUpload = (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
@@ -1558,90 +1676,153 @@ export function AdminPage() {
   };
 
   // Committee management helper functions
-  const handleAddCommitteeMember = () => {
+  const handleAddCommitteeMember = async () => {
     if (!newCommitteeMember.name.en || !newCommitteeMember.position.en || !newCommitteeMember.phone) {
-      alert('Please fill all required fields');
+      toast.error('Please fill all required fields');
       return;
     }
 
-    const member = {
-      id: Date.now(),
-      ...newCommitteeMember,
-      isActive: true
-    };
-
-    setCommitteeMembers([...committeeMembers, member]);
-    setNewCommitteeMember({
-      name: { en: '', mr: '' },
-      position: { en: '', mr: '' },
-      ward: '',
-      phone: '',
-      email: '',
-      experience: { en: '', mr: '' },
-      education: { en: '', mr: '' },
-      achievements: [],
-      photo: null,
-      color: 'bg-blue-500',
-      joinDate: '',
-      termEnd: ''
-    });
-    setIsAddCommitteeMemberOpen(false);
+    try {
+      await adminCreateCommitteeMember(newCommitteeMember);
+      toast.success('Committee member added successfully');
+      
+      // Refresh the committee members list
+      await fetchCommitteeMembers();
+      
+      // Reset form and close modal
+      setNewCommitteeMember({
+        name: { en: '', mr: '' },
+        position: { en: '', mr: '' },
+        ward: '',
+        phone: '',
+        email: '',
+        experience: { en: '', mr: '' },
+        education: { en: '', mr: '' },
+        achievements: [],
+        photo: null,
+        color: 'bg-blue-500',
+        joinDate: '',
+        termEnd: ''
+      });
+      setIsAddCommitteeMemberOpen(false);
+    } catch (error) {
+      console.error('Failed to add committee member:', error);
+      toast.error('Failed to add committee member');
+    }
   };
 
-  const handleUpdateCommitteeMember = () => {
+  const handleUpdateCommitteeMember = async () => {
     if (!selectedCommitteeMember) return;
     
-    setCommitteeMembers(committeeMembers.map(m => 
-      m.id === selectedCommitteeMember.id ? selectedCommitteeMember : m
-    ));
-    setSelectedCommitteeMember(null);
-    setIsEditCommitteeMemberOpen(false);
+    try {
+      await adminUpdateCommitteeMember(selectedCommitteeMember._id, selectedCommitteeMember);
+      toast.success('Committee member updated successfully');
+      
+      // Refresh the committee members list
+      await fetchCommitteeMembers();
+      
+      // Clear selection and close modal
+      setSelectedCommitteeMember(null);
+      setIsEditCommitteeMemberOpen(false);
+    } catch (error) {
+      console.error('Failed to update committee member:', error);
+      toast.error('Failed to update committee member');
+    }
   };
 
-  const handleDeleteCommitteeMember = (member) => {
-    const confirmed = window.confirm(`Are you sure you want to remove ${member.name.en} from the committee?`);
+  const handleDeleteCommitteeMember = async (memberId) => {
+    const confirmed = window.confirm('Are you sure you want to delete this committee member?');
     if (!confirmed) return;
 
-    setCommitteeMembers(committeeMembers.filter(m => m.id !== member.id));
+    try {
+      await adminDeleteCommitteeMember(memberId);
+      toast.success('Committee member deleted successfully');
+      
+      // Refresh the committee members list
+      await fetchCommitteeMembers();
+    } catch (error) {
+      console.error('Failed to delete committee member:', error);
+      toast.error('Failed to delete committee member');
+    }
   };
 
-  const handleAddDepartment = () => {
+  const handleAddDepartment = async () => {
     if (!newDepartment.name.en || !newDepartment.head.en || !newDepartment.phone) {
-      alert('Please fill all required fields');
+      toast.error('Please fill all required fields');
       return;
     }
 
-    const department = {
-      id: Date.now(),
-      ...newDepartment,
-      isActive: true
-    };
-
-    setDepartments([...departments, department]);
-    setNewDepartment({
-      name: { en: '', mr: '' },
-      head: { en: '', mr: '' },
-      phone: '',
-      email: '',
-      services: []
-    });
-    setIsAddDepartmentOpen(false);
+    try {
+      await adminCreateDepartment(newDepartment);
+      toast.success('Department added successfully');
+      
+      // Refresh the departments list
+      await fetchDepartments();
+      
+      // Reset form and close modal
+      setNewDepartment({
+        name: { en: '', mr: '' },
+        head: { en: '', mr: '' },
+        phone: '',
+        email: '',
+        services: []
+      });
+      setIsAddDepartmentOpen(false);
+    } catch (error) {
+      console.error('Failed to add department:', error);
+      toast.error('Failed to add department');
+    }
   };
 
-  const handleUpdateDepartment = () => {
+  const handleUpdateDepartment = async () => {
     if (!selectedDepartment) return;
     
-    setDepartments(departments.map(d => 
-      d.id === selectedDepartment.id ? selectedDepartment : d
-    ));
-    setSelectedDepartment(null);
+    try {
+      await adminUpdateDepartment(selectedDepartment._id, selectedDepartment);
+      toast.success('Department updated successfully');
+      
+      // Refresh the departments list
+      await fetchDepartments();
+      
+      // Clear selection
+      setSelectedDepartment(null);
+    } catch (error) {
+      console.error('Failed to update department:', error);
+      toast.error('Failed to update department');
+    }
   };
 
-  const handleDeleteDepartment = (department) => {
-    const confirmed = window.confirm(`Are you sure you want to delete the ${department.name.en}?`);
+  const handleDeleteDepartment = async (departmentId) => {
+    const confirmed = window.confirm('Are you sure you want to delete this department?');
     if (!confirmed) return;
 
-    setDepartments(departments.filter(d => d.id !== department.id));
+    try {
+      await adminDeleteDepartment(departmentId);
+      toast.success('Department deleted successfully');
+      
+      // Refresh the departments list
+      await fetchDepartments();
+    } catch (error) {
+      console.error('Failed to delete department:', error);
+      toast.error('Failed to delete department');
+    }
+  };
+
+  // Office Information Management
+  const handleUpdateOfficeInfo = async () => {
+    try {
+      await adminUpdateOfficeInfo(officeInfo);
+      toast.success('Office information updated successfully');
+      setIsOfficeInfoEditOpen(false);
+    } catch (error) {
+      console.error('Failed to update office info:', error);
+      toast.error('Failed to update office information');
+    }
+  };
+
+  const handleExportMembersCsv = () => {
+    exportCommitteeToCSV();
+    toast.success(t({ en: 'Committee members CSV exported successfully', mr: 'समिती सदस्य CSV यशस्वीरित्या एक्सपोर्ट झाला' }));
   };
 
   const exportCommitteeToCSV = () => {
@@ -1733,15 +1914,6 @@ export function AdminPage() {
     setIsAddMediaOpen(false);
   };
 
-  const handleUpdateMedia = () => {
-    if (!selectedMedia) return;
-    
-    setMediaItems(mediaItems.map(m => 
-      m.id === selectedMedia.id ? selectedMedia : m
-    ));
-    setSelectedMedia(null);
-    setIsEditMediaOpen(false);
-  };
 
   const handleDeleteMedia = (media) => {
     const confirmed = window.confirm(`Are you sure you want to delete "${media.title.en}"?`);
@@ -1771,29 +1943,7 @@ export function AdminPage() {
     ));
   };
 
-  const handleAddCategory = () => {
-    if (!newMediaCategory.label.en) {
-      alert('Please fill the category name');
-      return;
-    }
 
-    const category = {
-      id: newMediaCategory.label.en.toLowerCase().replace(/\s+/g, '-'),
-      label: newMediaCategory.label,
-      count: 0
-    };
-
-    setMediaCategories([...mediaCategories, category]);
-    setNewMediaCategory({ label: { en: '', mr: '' } });
-    setIsAddCategoryOpen(false);
-  };
-
-  const handleDeleteCategory = (categoryId) => {
-    const confirmed = window.confirm('Are you sure you want to delete this category?');
-    if (!confirmed) return;
-
-    setMediaCategories(mediaCategories.filter(cat => cat.id !== categoryId));
-  };
 
   const exportMediaToCSV = () => {
     const headers = [
@@ -3575,26 +3725,307 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
           </TabsContent>
 
           <TabsContent value="committee">
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                {t({ en: 'Committee Management', mr: 'समिती व्यवस्थापन' })}
-              </h3>
-              <p className="text-gray-600">
-                {t({ en: 'Manage village committee members', mr: 'गाव समिती सदस्यांचे व्यवस्थापन करा' })}
-              </p>
+            <div className="space-y-6 p-6 bg-gray-50 min-h-screen">
+              {/* Committee Management Header */}
+              <div className="bg-white rounded-lg shadow-sm border p-6">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-900 mb-2">
+                      {t({ en: 'Committee Management', mr: 'समिती व्यवस्थापन' })}
+                    </h1>
+                    <p className="text-gray-600 text-lg">
+                      {t({ en: 'Manage committee members, departments, and office information', mr: 'समिती सदस्य, विभाग आणि कार्यालय माहिती व्यवस्थापित करा' })}
+                    </p>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button 
+                      onClick={() => setIsAddCommitteeMemberOpen(true)} 
+                      className="bg-teal-600 hover:bg-teal-700 text-blue
+                       px-6 py-3 text-sm font-medium shadow-md hover:shadow-lg transition-all duration-200"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t({ en: 'Add Member', mr: 'सदस्य जोडा' })}
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      className="border-blue-600 text-blue-600 hover:bg-blue-50 px-6 py-3 text-sm font-medium shadow-md hover:shadow-lg transition-all duration-200"
+                      onClick={handleExportMembersCsv}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {t({ en: 'Export CSV', mr: 'CSV एक्सपोर्ट करा' })}
+                    </Button>
+                  </div>
+                </div>
               </div>
-          </TabsContent>
 
-          <TabsContent value="media">
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                {t({ en: 'Media Management', mr: 'मीडिया व्यवस्थापन' })}
-              </h3>
-              <p className="text-gray-600">
-                {t({ en: 'Manage village photos and videos', mr: 'गाव फोटो आणि व्हिडिओ व्यवस्थापित करा' })}
-              </p>
+              {/* Statistics Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                <Card className="bg-white shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                  <CardContent className="pt-6 pb-6 text-center">
+                    <div className="text-2xl font-bold text-blue-600 mb-2">
+                      {committeeMembers.filter(m => m.isActive).length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {t({ en: 'Active Members', mr: 'सक्रिय सदस्य' })}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                  <CardContent className="pt-6 pb-6 text-center">
+                    <div className="text-2xl font-bold text-orange-600 mb-2">
+                      {departments.length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {t({ en: 'Departments', mr: 'विभाग' })}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                  <CardContent className="pt-6 pb-6 text-center">
+                    <div className="text-2xl font-bold text-blue-600 mb-2">
+                      {committeeMembers.filter(m => m.ward && m.ward !== 'Administrative').length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {t({ en: 'Ward Members', mr: 'वार्ड सदस्य' })}
+                    </div>
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-white shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200">
+                  <CardContent className="pt-6 pb-6 text-center">
+                    <div className="text-2xl font-bold text-purple-600 mb-2">
+                      {committeeMembers.filter(m => m.position?.en?.toLowerCase().includes('sarpanch') || m.position?.en?.toLowerCase().includes('deputy')).length}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      {t({ en: 'Key Positions', mr: 'मुख्य पदे' })}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Action Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+                <Card 
+                  className="bg-white shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer group hover:-translate-y-1" 
+                  onClick={() => setIsDepartmentManagementOpen(true)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center group-hover:bg-blue-200 transition-colors duration-300">
+                        <Settings className="h-6 w-6 text-blue-600" />
+                      </div>
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        {t({ en: 'Manage Departments', mr: 'विभाग व्यवस्थापित करा' })}
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-gray-600 text-sm leading-relaxed">
+                      {t({ en: 'Add, edit, or remove departments', mr: 'विभाग जोडा, संपादित करा किंवा काढा' })}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className="bg-white shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer group hover:-translate-y-1" 
+                  onClick={() => setIsOfficeInfoEditOpen(true)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center group-hover:bg-green-200 transition-colors duration-300">
+                        <MapPin className="h-6 w-6 text-green-600" />
+                      </div>
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        {t({ en: 'Office Information', mr: 'कार्यालय माहिती' })}
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-gray-600 text-sm leading-relaxed">
+                      {t({ en: 'Update contact details and hours', mr: 'संपर्क माहिती आणि वेळा अपडेट करा' })}
+                    </p>
+                  </CardContent>
+                </Card>
+
+                <Card 
+                  className="bg-white shadow-sm border border-gray-200 hover:shadow-lg transition-all duration-300 cursor-pointer group hover:-translate-y-1" 
+                  onClick={() => setIsOfficeHoursEditOpen(true)}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-center space-x-3">
+                      <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center group-hover:bg-purple-200 transition-colors duration-300">
+                        <Calendar className="h-6 w-6 text-purple-600" />
+                      </div>
+                      <CardTitle className="text-lg font-semibold text-gray-900">
+                        {t({ en: 'Office Hours', mr: 'कार्यालयीन वेळा' })}
+                      </CardTitle>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="pt-0">
+                    <p className="text-gray-600 text-sm leading-relaxed">
+                      {officeInfo?.officeHours && officeInfo.officeHours.length > 0 
+                        ? `${t({ en: 'Monday - Saturday', mr: 'सोमवार - शनिवार' })}: ${officeInfo.officeHours[0]?.hours || '9 AM - 5 PM'}`
+                        : t({ en: 'Monday - Saturday: 9 AM - 5 PM', mr: 'सोमवार - शनिवार: 9 AM - 5 PM' })
+                      }
+                    </p>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Committee Members Table */}
+              <Card className="bg-white shadow-sm border border-gray-200">
+                <CardHeader className="bg-gray-50 border-b">
+                  <CardTitle className="text-2xl font-bold text-gray-900">
+                    {t({ en: 'Committee Members', mr: 'समिती सदस्य' })}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader className="bg-gray-50">
+                        <TableRow className="border-b border-gray-200">
+                          <TableHead className="font-semibold text-gray-700 py-4 px-6">{t({ en: 'Name', mr: 'नाव' })}</TableHead>
+                          <TableHead className="font-semibold text-gray-700 py-4 px-6">{t({ en: 'Position', mr: 'पद' })}</TableHead>
+                          <TableHead className="font-semibold text-gray-700 py-4 px-6">{t({ en: 'Ward/Department', mr: 'वार्ड/विभाग' })}</TableHead>
+                          <TableHead className="font-semibold text-gray-700 py-4 px-6">{t({ en: 'Contact', mr: 'संपर्क' })}</TableHead>
+                          <TableHead className="font-semibold text-gray-700 py-4 px-6">{t({ en: 'Term', mr: 'कार्यकाळ' })}</TableHead>
+                          <TableHead className="font-semibold text-gray-700 py-4 px-6">{t({ en: 'Status', mr: 'स्थिती' })}</TableHead>
+                          <TableHead className="font-semibold text-gray-700 py-4 px-6 text-right">{t({ en: 'Actions', mr: 'क्रिया' })}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {committeeMembers.length === 0 ? (
+                          <TableRow>
+                            <TableCell colSpan={7} className="text-center py-16 text-gray-500">
+                              <div className="flex flex-col items-center">
+                                <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mb-6">
+                                  <User className="h-10 w-10 text-gray-400" />
+                                </div>
+                                <p className="text-xl font-semibold text-gray-700 mb-2">{t({ en: 'No committee members found', mr: 'कोणतेही समिती सदस्य नाही' })}</p>
+                                <p className="text-gray-500 mb-4">{t({ en: 'Add your first committee member to get started', mr: 'सुरुवात करण्यासाठी आपला पहिला समिती सदस्य जोडा' })}</p>
+                                <Button 
+                                  onClick={() => setIsAddCommitteeMemberOpen(true)}
+                                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                                >
+                                  <Plus className="h-4 w-4 mr-2" />
+                                  {t({ en: 'Add First Member', mr: 'पहिला सदस्य जोडा' })}
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ) : (
+                          committeeMembers.map((member, index) => (
+                            <TableRow 
+                              key={member._id || member.id} 
+                              className={`hover:bg-gray-50 transition-colors duration-200 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-25'}`}
+                            >
+                              <TableCell className="py-4 px-6">
+                                <div className="flex items-center space-x-4">
+                                  <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center">
+                                    <span className="text-purple-600 font-bold text-base">
+                                      {member.name?.en?.charAt(0) || member.name?.mr?.charAt(0) || 'M'}
+                                    </span>
+                                  </div>
+                                  <div>
+                                    <div className="font-semibold text-gray-900">{member.name?.en || ''}</div>
+                                    <div className="text-sm text-gray-500">{member.name?.mr || ''}</div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-4 px-6">
+                                <div>
+                                  <div className="font-medium text-gray-900">{member.position?.en || ''}</div>
+                                  <div className="text-sm text-gray-500">{member.position?.mr || ''}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-4 px-6">
+                                {member.ward && member.ward !== 'Administrative' ? (
+                                  <Badge variant="secondary" className="bg-blue-100 text-blue-800 font-medium">
+                                    {member.ward}
+                                  </Badge>
+                                ) : (
+                                  <Badge variant="secondary" className="bg-gray-100 text-gray-800 font-medium">
+                                    {t({ en: 'Administrative', mr: 'प्रशासकीय' })}
+                                  </Badge>
+                                )}
+                              </TableCell>
+                              <TableCell className="py-4 px-6">
+                                <div className="space-y-2">
+                                  <div className="flex items-center space-x-2">
+                                    <Phone className="h-4 w-4 text-gray-400" />
+                                    <span className="text-sm font-medium">{member.phone || '-'}</span>
+                                  </div>
+                                  <div className="flex items-center space-x-2">
+                                    <Mail className="h-4 w-4 text-gray-400" />
+                                    <span className="text-sm text-gray-600">{member.email || '-'}</span>
+                                  </div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-4 px-6">
+                                <div className="text-sm space-y-1">
+                                  <div className="font-medium text-gray-900">{t({ en: 'From', mr: 'पासून' })}: {member.joinDate ? new Date(member.joinDate).toLocaleDateString() : '-'}</div>
+                                  <div className="text-gray-600">{t({ en: 'Until', mr: 'पर्यंत' })}: {member.termEnd ? new Date(member.termEnd).toLocaleDateString() : '-'}</div>
+                                </div>
+                              </TableCell>
+                              <TableCell className="py-4 px-6">
+                                <Badge 
+                                  variant={member.isActive ? 'default' : 'secondary'}
+                                  className={`font-medium ${member.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}
+                                >
+                                  {member.isActive 
+                                    ? t({ en: 'Active', mr: 'सक्रिय' })
+                                    : t({ en: 'Inactive', mr: 'निष्क्रिय' })
+                                  }
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-4 px-6 text-right">
+                                <div className="flex justify-end space-x-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedCommitteeMember(member);
+                                      setIsCommitteeMemberDetailOpen(true);
+                                    }}
+                                    className="hover:bg-blue-50 hover:border-blue-300 transition-colors duration-200"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => {
+                                      setSelectedCommitteeMember(member);
+                                      setIsEditCommitteeMemberOpen(true);
+                                    }}
+                                    className="hover:bg-yellow-50 hover:border-yellow-300 transition-colors duration-200"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleDeleteCommitteeMember(member._id)}
+                                    className="hover:bg-red-50 hover:border-red-300 transition-colors duration-200"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          ))
+                        )}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
+
             </div>
           </TabsContent>
+
 
           <TabsContent value="news">
             <div className="space-y-6">
@@ -3991,6 +4422,292 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                   </div>
                 </div>
               )}
+            </div>
+          </TabsContent>
+
+          {/* Media Management Tab */}
+          <TabsContent value="media" className="space-y-6">
+            <div className="space-y-6">
+              {/* Media Management Header */}
+              <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">{t({ en: 'Media Management', mr: 'मीडिया व्यवस्थापन' })}</h2>
+                  <p className="text-gray-600 mt-1">{t({ en: 'Manage photos, videos, and media categories', mr: 'फोटो, व्हिडिओ आणि मीडिया श्रेण्या व्यवस्थापित करा' })}</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button 
+                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    onClick={() => setIsAddMediaOpen(true)}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t({ en: 'Add Media', mr: 'मीडिया जोडा' })}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    className="border-indigo-500 text-indigo-600 hover:bg-indigo-50"
+                    onClick={() => setIsCategoryModalOpen(true)}
+                  >
+                    <Folder className="h-4 w-4 mr-2" />
+                    {t({ en: 'Manage Categories', mr: 'श्रेण्या व्यवस्थापित करा' })}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Media Stats Cards */}
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{t({ en: 'Total Media', mr: 'एकूण मीडिया' })}</p>
+                        <p className="text-2xl font-bold text-gray-900">{mediaItems.length}</p>
+                      </div>
+                      <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                        <Camera className="h-4 w-4 text-blue-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{t({ en: 'Photos', mr: 'फोटो' })}</p>
+                        <p className="text-2xl font-bold text-gray-900">{mediaItems.filter(item => item.mediaType === 'Photo').length}</p>
+                      </div>
+                      <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+                        <Image className="h-4 w-4 text-green-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{t({ en: 'Videos', mr: 'व्हिडिओ' })}</p>
+                        <p className="text-2xl font-bold text-gray-900">{mediaItems.filter(item => item.mediaType === 'Video').length}</p>
+                      </div>
+                      <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
+                        <Video className="h-4 w-4 text-purple-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{t({ en: 'Categories', mr: 'श्रेण्या' })}</p>
+                        <p className="text-2xl font-bold text-gray-900">{mediaCategories.length}</p>
+                      </div>
+                      <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
+                        <Folder className="h-4 w-4 text-orange-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{t({ en: 'Featured', mr: 'विशेष' })}</p>
+                        <p className="text-2xl font-bold text-gray-900">{mediaItems.filter(item => item.isFeatured).length}</p>
+                      </div>
+                      <div className="h-8 w-8 bg-yellow-100 rounded-full flex items-center justify-center">
+                        <Star className="h-4 w-4 text-yellow-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{t({ en: 'Total Views', mr: 'एकूण दृश्ये' })}</p>
+                        <p className="text-2xl font-bold text-gray-900">{mediaItems.reduce((sum, item) => sum + (item.views || 0), 0)}</p>
+                      </div>
+                      <div className="h-8 w-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                        <Eye className="h-4 w-4 text-indigo-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{t({ en: 'Total Likes', mr: 'एकूण लाइक्स' })}</p>
+                        <p className="text-2xl font-bold text-gray-900">{mediaItems.reduce((sum, item) => sum + (item.likes || 0), 0)}</p>
+                      </div>
+                      <div className="h-8 w-8 bg-red-100 rounded-full flex items-center justify-center">
+                        <Heart className="h-4 w-4 text-red-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="border-0 shadow-lg">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-gray-600">{t({ en: 'This Month', mr: 'या महिन्यात' })}</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          {mediaItems.filter(item => {
+                            const itemDate = new Date(item.createdAt);
+                            const now = new Date();
+                            return itemDate.getMonth() === now.getMonth() && itemDate.getFullYear() === now.getFullYear();
+                          }).length}
+                        </p>
+                      </div>
+                      <div className="h-8 w-8 bg-teal-100 rounded-full flex items-center justify-center">
+                        <Calendar className="h-4 w-4 text-teal-600" />
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Media Items Table */}
+              <Card className="border-0 shadow-lg">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Camera className="h-5 w-5" />
+                    {t({ en: 'All Media Items', mr: 'सर्व मीडिया आयटम' })}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>{t({ en: 'Thumbnail', mr: 'थंबनेल' })}</TableHead>
+                          <TableHead>{t({ en: 'Title', mr: 'शीर्षक' })}</TableHead>
+                          <TableHead>{t({ en: 'Type', mr: 'प्रकार' })}</TableHead>
+                          <TableHead>{t({ en: 'Category', mr: 'श्रेणी' })}</TableHead>
+                          <TableHead>{t({ en: 'Date', mr: 'तारीख' })}</TableHead>
+                          <TableHead>{t({ en: 'Views', mr: 'दृश्ये' })}</TableHead>
+                          <TableHead>{t({ en: 'Likes', mr: 'लाइक्स' })}</TableHead>
+                          <TableHead>{t({ en: 'Actions', mr: 'क्रिया' })}</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {mediaItems.map((item) => (
+                          <TableRow key={item._id} className="hover:bg-gray-50">
+                            <TableCell>
+                              <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+                                {item.thumbnailUrl ? (
+                                  <img 
+                                    src={item.thumbnailUrl} 
+                                    alt={item.title.en}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.target.src = 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400&h=300&fit=crop';
+                                    }}
+                                  />
+                                ) : item.mediaType === 'Photo' ? (
+                                  <img 
+                                    src={item.fileUrl || 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400&h=300&fit=crop'} 
+                                    alt={item.title.en}
+                                    className="w-full h-full object-cover"
+                                    onError={(e) => {
+                                      e.target.src = 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=400&h=300&fit=crop';
+                                    }}
+                                  />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                                    <Video className="h-6 w-6 text-gray-400" />
+                                  </div>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div>
+                                <div className="font-medium">{item.title.en}</div>
+                                {item.title.mr && (
+                                  <div className="text-sm text-gray-500">{item.title.mr}</div>
+                                )}
+                                {item.isFeatured && (
+                                  <Badge variant="outline" className="text-xs border-purple-200 text-purple-700 mt-1">
+                                    Featured
+                                  </Badge>
+                                )}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge 
+                                variant={item.mediaType === 'Photo' ? 'secondary' : 'default'}
+                                className="text-xs"
+                              >
+                                {item.mediaType}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline" className="text-xs">
+                                {item.category?.name?.en || 'Uncategorized'}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <div className="text-sm">
+                                <div>{new Date(item.createdAt).toLocaleDateString()}</div>
+                                <div className="text-gray-500">{new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Eye className="h-3 w-3" />
+                                {item.views || 0}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-1">
+                                <Heart className="h-3 w-3" />
+                                {item.likes || 0}
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex gap-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => window.open(item.fileUrl, '_blank')}
+                                  title="View Media"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedMedia(item);
+                                    setIsEditMediaOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleDeleteMediaItem(item._id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
         </Tabs>
@@ -5049,6 +5766,1799 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 </div>
               </div>
             )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Department Management Modal */}
+        <Dialog open={isDepartmentManagementOpen} onOpenChange={setIsDepartmentManagementOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle>{t({ en: 'Department Management', mr: 'विभाग व्यवस्थापन' })}</DialogTitle>
+            
+            <div className="space-y-6">
+              {/* Add Department Button */}
+              <div className="flex justify-end">
+                <Button onClick={() => setIsAddDepartmentOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t({ en: 'Add Department', mr: 'विभाग जोडा' })}
+                </Button>
+              </div>
+
+              {/* Departments List */}
+              <div className="space-y-4">
+                {departments.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">
+                    {t({ en: 'No departments found', mr: 'कोणतेही विभाग नाही' })}
+                  </p>
+                ) : (
+                  departments.map((dept) => (
+                    <div key={dept._id || dept.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <h3 className="font-semibold">{dept.name?.en || ''}</h3>
+                            <Badge variant={dept.isActive ? 'default' : 'secondary'}>
+                              {dept.isActive 
+                                ? t({ en: 'Active', mr: 'सक्रिय' })
+                                : t({ en: 'Inactive', mr: 'निष्क्रिय' })
+                              }
+                            </Badge>
+                          </div>
+                          <div className="text-sm text-gray-600 space-y-1">
+                            <div><strong>{t({ en: 'Head', mr: 'प्रमुख' })}:</strong> {dept.head?.en || ''}</div>
+                            <div><strong>{t({ en: 'Phone', mr: 'फोन' })}:</strong> {dept.phone || '-'}</div>
+                            <div><strong>{t({ en: 'Email', mr: 'ईमेल' })}:</strong> {dept.email || '-'}</div>
+                            {dept.services && dept.services.length > 0 && (
+                              <div>
+                                <strong>{t({ en: 'Services', mr: 'सेवा' })}:</strong>
+                                <ul className="list-disc list-inside ml-2">
+                                  {dept.services.map((service, index) => (
+                                    <li key={index}>{service.en}</li>
+                                  ))}
+                                </ul>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              setSelectedDepartment(dept);
+                              setIsAddDepartmentOpen(true);
+                            }}
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleDeleteDepartment(dept._id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add/Edit Department Modal */}
+        <Dialog open={isAddDepartmentOpen} onOpenChange={setIsAddDepartmentOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogTitle>
+              {selectedDepartment 
+                ? t({ en: 'Edit Department', mr: 'विभाग संपादित करा' })
+                : t({ en: 'Add Department', mr: 'विभाग जोडा' })
+              }
+            </DialogTitle>
+            
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="dept-name-en">{t({ en: 'Department Name (English)', mr: 'विभाग नाव (इंग्रजी)' })} *</Label>
+                  <Input
+                    id="dept-name-en"
+                    value={selectedDepartment ? selectedDepartment.name?.en : newDepartment.name.en}
+                    onChange={(e) => {
+                      if (selectedDepartment) {
+                        setSelectedDepartment({
+                          ...selectedDepartment,
+                          name: { ...selectedDepartment.name, en: e.target.value }
+                        });
+                      } else {
+                        setNewDepartment({
+                          ...newDepartment,
+                          name: { ...newDepartment.name, en: e.target.value }
+                        });
+                      }
+                    }}
+                    placeholder="Department name in English"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dept-name-mr">{t({ en: 'Department Name (Marathi)', mr: 'विभाग नाव (मराठी)' })}</Label>
+                  <Input
+                    id="dept-name-mr"
+                    value={selectedDepartment ? selectedDepartment.name?.mr : newDepartment.name.mr}
+                    onChange={(e) => {
+                      if (selectedDepartment) {
+                        setSelectedDepartment({
+                          ...selectedDepartment,
+                          name: { ...selectedDepartment.name, mr: e.target.value }
+                        });
+                      } else {
+                        setNewDepartment({
+                          ...newDepartment,
+                          name: { ...newDepartment.name, mr: e.target.value }
+                        });
+                      }
+                    }}
+                    placeholder="विभाग नाव मराठीत"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="dept-head-en">{t({ en: 'Head (English)', mr: 'प्रमुख (इंग्रजी)' })} *</Label>
+                  <Input
+                    id="dept-head-en"
+                    value={selectedDepartment ? selectedDepartment.head?.en : newDepartment.head.en}
+                    onChange={(e) => {
+                      if (selectedDepartment) {
+                        setSelectedDepartment({
+                          ...selectedDepartment,
+                          head: { ...selectedDepartment.head, en: e.target.value }
+                        });
+                      } else {
+                        setNewDepartment({
+                          ...newDepartment,
+                          head: { ...newDepartment.head, en: e.target.value }
+                        });
+                      }
+                    }}
+                    placeholder="Head name in English"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dept-head-mr">{t({ en: 'Head (Marathi)', mr: 'प्रमुख (मराठी)' })}</Label>
+                  <Input
+                    id="dept-head-mr"
+                    value={selectedDepartment ? selectedDepartment.head?.mr : newDepartment.head.mr}
+                    onChange={(e) => {
+                      if (selectedDepartment) {
+                        setSelectedDepartment({
+                          ...selectedDepartment,
+                          head: { ...selectedDepartment.head, mr: e.target.value }
+                        });
+                      } else {
+                        setNewDepartment({
+                          ...newDepartment,
+                          head: { ...newDepartment.head, mr: e.target.value }
+                        });
+                      }
+                    }}
+                    placeholder="प्रमुख नाव मराठीत"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="dept-phone">{t({ en: 'Phone', mr: 'फोन' })} *</Label>
+                  <Input
+                    id="dept-phone"
+                    value={selectedDepartment ? selectedDepartment.phone : newDepartment.phone}
+                    onChange={(e) => {
+                      if (selectedDepartment) {
+                        setSelectedDepartment({ ...selectedDepartment, phone: e.target.value });
+                      } else {
+                        setNewDepartment({ ...newDepartment, phone: e.target.value });
+                      }
+                    }}
+                    placeholder="+91 9876543210"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="dept-email">{t({ en: 'Email', mr: 'ईमेल' })}</Label>
+                  <Input
+                    id="dept-email"
+                    value={selectedDepartment ? selectedDepartment.email : newDepartment.email}
+                    onChange={(e) => {
+                      if (selectedDepartment) {
+                        setSelectedDepartment({ ...selectedDepartment, email: e.target.value });
+                      } else {
+                        setNewDepartment({ ...newDepartment, email: e.target.value });
+                      }
+                    }}
+                    placeholder="department@village.gov.in"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsAddDepartmentOpen(false);
+                    setSelectedDepartment(null);
+                  }}
+                >
+                  {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                </Button>
+                <Button onClick={selectedDepartment ? handleUpdateDepartment : handleAddDepartment}>
+                  {selectedDepartment 
+                    ? t({ en: 'Update Department', mr: 'विभाग अद्यतनित करा' })
+                    : t({ en: 'Add Department', mr: 'विभाग जोडा' })
+                  }
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Office Information Edit Modal */}
+        <Dialog open={isOfficeInfoEditOpen} onOpenChange={setIsOfficeInfoEditOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogTitle>{t({ en: 'Edit Office Information', mr: 'कार्यालय माहिती संपादित करा' })}</DialogTitle>
+            
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="office-address-en">{t({ en: 'Address (English)', mr: 'पत्ता (इंग्रजी)' })}</Label>
+                <Textarea
+                  id="office-address-en"
+                  value={officeInfo.address?.en || ''}
+                  onChange={(e) => setOfficeInfo({
+                    ...officeInfo,
+                    address: { ...officeInfo.address, en: e.target.value }
+                  })}
+                  placeholder="Office address in English"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="office-address-mr">{t({ en: 'Address (Marathi)', mr: 'पत्ता (मराठी)' })}</Label>
+                <Textarea
+                  id="office-address-mr"
+                  value={officeInfo.address?.mr || ''}
+                  onChange={(e) => setOfficeInfo({
+                    ...officeInfo,
+                    address: { ...officeInfo.address, mr: e.target.value }
+                  })}
+                  placeholder="कार्यालय पत्ता मराठीत"
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="office-phone">{t({ en: 'Phone', mr: 'फोन' })}</Label>
+                  <Input
+                    id="office-phone"
+                    value={officeInfo.phone || ''}
+                    onChange={(e) => setOfficeInfo({ ...officeInfo, phone: e.target.value })}
+                    placeholder="+91 20 1234 5678"
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="office-email">{t({ en: 'Email', mr: 'ईमेल' })}</Label>
+                  <Input
+                    id="office-email"
+                    value={officeInfo.email || ''}
+                    onChange={(e) => setOfficeInfo({ ...officeInfo, email: e.target.value })}
+                    placeholder="office@village.gov.in"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="office-emergency">{t({ en: 'Emergency Contact', mr: 'आपत्कालीन संपर्क' })}</Label>
+                <Input
+                  id="office-emergency"
+                  value={officeInfo.emergencyContact || ''}
+                  onChange={(e) => setOfficeInfo({ ...officeInfo, emergencyContact: e.target.value })}
+                  placeholder="+91 9876543210"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="office-meeting-en">{t({ en: 'Public Meeting Info (English)', mr: 'सार्वजनिक सभा माहिती (इंग्रजी)' })}</Label>
+                <Textarea
+                  id="office-meeting-en"
+                  value={officeInfo.publicMeetingInfo?.en || ''}
+                  onChange={(e) => setOfficeInfo({
+                    ...officeInfo,
+                    publicMeetingInfo: { ...officeInfo.publicMeetingInfo, en: e.target.value }
+                  })}
+                  placeholder="Public meeting information in English"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="office-meeting-mr">{t({ en: 'Public Meeting Info (Marathi)', mr: 'सार्वजनिक सभा माहिती (मराठी)' })}</Label>
+                <Textarea
+                  id="office-meeting-mr"
+                  value={officeInfo.publicMeetingInfo?.mr || ''}
+                  onChange={(e) => setOfficeInfo({
+                    ...officeInfo,
+                    publicMeetingInfo: { ...officeInfo.publicMeetingInfo, mr: e.target.value }
+                  })}
+                  placeholder="सार्वजनिक सभा माहिती मराठीत"
+                  rows={2}
+                />
+              </div>
+
+              <div className="flex justify-end space-x-2">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsOfficeInfoEditOpen(false)}
+                >
+                  {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                </Button>
+                <Button onClick={handleUpdateOfficeInfo}>
+                  {t({ en: 'Save Changes', mr: 'बदल जतन करा' })}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Committee Member Modal */}
+        <Dialog open={isAddCommitteeMemberOpen} onOpenChange={setIsAddCommitteeMemberOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-gray-900">
+                {t({ en: 'Add Committee Member', mr: 'समिती सदस्य जोडा' })}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6 py-4">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                  {t({ en: 'Basic Information', mr: 'मूलभूत माहिती' })}
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="name-en" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Name (English)', mr: 'नाव (इंग्रजी)' })} <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="name-en"
+                      value={newCommitteeMember.name.en}
+                      onChange={(e) => setNewCommitteeMember({
+                        ...newCommitteeMember,
+                        name: { ...newCommitteeMember.name, en: e.target.value }
+                      })}
+                      placeholder={t({ en: 'Enter name in English', mr: 'इंग्रजीत नाव टाका' })}
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="name-mr" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Name (Marathi)', mr: 'नाव (मराठी)' })}
+                    </Label>
+                    <Input
+                      id="name-mr"
+                      value={newCommitteeMember.name.mr}
+                      onChange={(e) => setNewCommitteeMember({
+                        ...newCommitteeMember,
+                        name: { ...newCommitteeMember.name, mr: e.target.value }
+                      })}
+                      placeholder={t({ en: 'मराठीत नाव टाका', mr: 'मराठीत नाव टाका' })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="position-en" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Position (English)', mr: 'पद (इंग्रजी)' })} <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="position-en"
+                      value={newCommitteeMember.position.en}
+                      onChange={(e) => setNewCommitteeMember({
+                        ...newCommitteeMember,
+                        position: { ...newCommitteeMember.position, en: e.target.value }
+                      })}
+                      placeholder={t({ en: 'e.g., Ward Member', mr: 'जसे, वार्ड सदस्य' })}
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="position-mr" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Position (Marathi)', mr: 'पद (मराठी)' })}
+                    </Label>
+                    <Input
+                      id="position-mr"
+                      value={newCommitteeMember.position.mr}
+                      onChange={(e) => setNewCommitteeMember({
+                        ...newCommitteeMember,
+                        position: { ...newCommitteeMember.position, mr: e.target.value }
+                      })}
+                      placeholder={t({ en: 'जसे, वार्ड सदस्य', mr: 'जसे, वार्ड सदस्य' })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="ward" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Ward/Department', mr: 'वार्ड/विभाग' })}
+                    </Label>
+                    <Input
+                      id="ward"
+                      value={newCommitteeMember.ward}
+                      onChange={(e) => setNewCommitteeMember({
+                        ...newCommitteeMember,
+                        ward: e.target.value
+                      })}
+                      placeholder={t({ en: 'e.g., Ward 1 or Administrative', mr: 'जसे, वार्ड 1 किंवा प्रशासकीय' })}
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="phone" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Phone', mr: 'फोन' })} <span className="text-red-500">*</span>
+                    </Label>
+                    <Input
+                      id="phone"
+                      value={newCommitteeMember.phone}
+                      onChange={(e) => setNewCommitteeMember({
+                        ...newCommitteeMember,
+                        phone: e.target.value
+                      })}
+                      placeholder={t({ en: '+91 9876543210', mr: '+91 9876543210' })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="email" className="text-sm font-medium text-gray-700">
+                    {t({ en: 'Email', mr: 'ईमेल' })}
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={newCommitteeMember.email}
+                    onChange={(e) => setNewCommitteeMember({
+                      ...newCommitteeMember,
+                      email: e.target.value
+                    })}
+                    placeholder={t({ en: 'email@example.com', mr: 'email@example.com' })}
+                    className="mt-1"
+                  />
+                </div>
+              </div>
+
+              {/* Dates */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                  {t({ en: 'Term Information', mr: 'कार्यकाळ माहिती' })}
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="join-date" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Join Date', mr: 'सामील होण्याची तारीख' })}
+                    </Label>
+                    <div className="relative mt-1">
+                      <Input
+                        id="join-date"
+                        type="date"
+                        value={newCommitteeMember.joinDate}
+                        onChange={(e) => setNewCommitteeMember({
+                          ...newCommitteeMember,
+                          joinDate: e.target.value
+                        })}
+                        className="pr-10"
+                      />
+                      <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="term-end" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Term End Date', mr: 'कार्यकाळ संपण्याची तारीख' })}
+                    </Label>
+                    <div className="relative mt-1">
+                      <Input
+                        id="term-end"
+                        type="date"
+                        value={newCommitteeMember.termEnd}
+                        onChange={(e) => setNewCommitteeMember({
+                          ...newCommitteeMember,
+                          termEnd: e.target.value
+                        })}
+                        className="pr-10"
+                      />
+                      <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Education and Experience */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                  {t({ en: 'Background Information', mr: 'पार्श्वभूमी माहिती' })}
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="education-en" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Education (English)', mr: 'शिक्षण (इंग्रजी)' })}
+                    </Label>
+                    <Input
+                      id="education-en"
+                      value={newCommitteeMember.education.en}
+                      onChange={(e) => setNewCommitteeMember({
+                        ...newCommitteeMember,
+                        education: { ...newCommitteeMember.education, en: e.target.value }
+                      })}
+                      placeholder={t({ en: 'Educational qualifications', mr: 'शैक्षणिक पात्रता' })}
+                      className="mt-1"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="experience-en" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Experience (English)', mr: 'अनुभव (इंग्रजी)' })}
+                    </Label>
+                    <Input
+                      id="experience-en"
+                      value={newCommitteeMember.experience.en}
+                      onChange={(e) => setNewCommitteeMember({
+                        ...newCommitteeMember,
+                        experience: { ...newCommitteeMember.experience, en: e.target.value }
+                      })}
+                      placeholder={t({ en: 'Professional experience', mr: 'व्यावसायिक अनुभव' })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3 pt-6 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setIsAddCommitteeMemberOpen(false);
+                    setNewCommitteeMember({
+                      name: { en: '', mr: '' },
+                      position: { en: '', mr: '' },
+                      ward: '',
+                      phone: '',
+                      email: '',
+                      experience: { en: '', mr: '' },
+                      education: { en: '', mr: '' },
+                      achievements: [],
+                      photo: null,
+                      color: 'bg-blue-500',
+                      joinDate: '',
+                      termEnd: ''
+                    });
+                  }}
+                  className="px-6 py-2"
+                >
+                  {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                </Button>
+                <Button
+                  onClick={handleAddCommitteeMember}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  {t({ en: 'Add Member', mr: 'सदस्य जोडा' })}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Committee Member Detail Modal */}
+        <Dialog open={isCommitteeMemberDetailOpen} onOpenChange={setIsCommitteeMemberDetailOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-gray-900">
+                {t({ en: 'Committee Member Details', mr: 'समिती सदस्य तपशील' })}
+              </DialogTitle>
+            </DialogHeader>
+            
+            {selectedCommitteeMember && (
+              <div className="space-y-6 py-4">
+                {/* Basic Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                    {t({ en: 'Basic Information', mr: 'मूलभूत माहिती' })}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Name (English)', mr: 'नाव (इंग्रजी)' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.name?.en || '-'}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Name (Marathi)', mr: 'नाव (मराठी)' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.name?.mr || '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Position (English)', mr: 'पद (इंग्रजी)' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.position?.en || '-'}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Position (Marathi)', mr: 'पद (मराठी)' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.position?.mr || '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Ward/Department', mr: 'वार्ड/विभाग' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.ward || '-'}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Phone', mr: 'फोन' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.phone || '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Email', mr: 'ईमेल' })}
+                    </Label>
+                    <p className="text-gray-900 font-medium mt-1">
+                      {selectedCommitteeMember.email || '-'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Term Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                    {t({ en: 'Term Information', mr: 'कार्यकाळ माहिती' })}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Join Date', mr: 'सामील होण्याची तारीख' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.joinDate ? new Date(selectedCommitteeMember.joinDate).toLocaleDateString() : '-'}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Term End Date', mr: 'कार्यकाळ संपण्याची तारीख' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.termEnd ? new Date(selectedCommitteeMember.termEnd).toLocaleDateString() : '-'}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Status', mr: 'स्थिती' })}
+                    </Label>
+                    <div className="mt-1">
+                      <Badge 
+                        variant={selectedCommitteeMember.isActive ? 'default' : 'secondary'}
+                        className={`font-medium ${selectedCommitteeMember.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}
+                      >
+                        {selectedCommitteeMember.isActive 
+                          ? t({ en: 'Active', mr: 'सक्रिय' })
+                          : t({ en: 'Inactive', mr: 'निष्क्रिय' })
+                        }
+                      </Badge>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Background Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                    {t({ en: 'Background Information', mr: 'पार्श्वभूमी माहिती' })}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Education (English)', mr: 'शिक्षण (इंग्रजी)' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.education?.en || '-'}
+                      </p>
+                    </div>
+                    
+                    <div>
+                      <Label className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Experience (English)', mr: 'अनुभव (इंग्रजी)' })}
+                      </Label>
+                      <p className="text-gray-900 font-medium mt-1">
+                        {selectedCommitteeMember.experience?.en || '-'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 pt-6 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => setIsCommitteeMemberDetailOpen(false)}
+                    className="px-6 py-2"
+                  >
+                    {t({ en: 'Close', mr: 'बंद करा' })}
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setIsCommitteeMemberDetailOpen(false);
+                      setIsEditCommitteeMemberOpen(true);
+                    }}
+                    className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {t({ en: 'Edit Member', mr: 'सदस्य संपादित करा' })}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Committee Member Modal */}
+        <Dialog open={isEditCommitteeMemberOpen} onOpenChange={setIsEditCommitteeMemberOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-gray-900">
+                {t({ en: 'Edit Committee Member', mr: 'समिती सदस्य संपादित करा' })}
+              </DialogTitle>
+            </DialogHeader>
+            
+            {selectedCommitteeMember && (
+              <div className="space-y-6 py-4">
+                {/* Basic Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                    {t({ en: 'Basic Information', mr: 'मूलभूत माहिती' })}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-name-en" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Name (English)', mr: 'नाव (इंग्रजी)' })} <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="edit-name-en"
+                        value={selectedCommitteeMember.name?.en || ''}
+                        onChange={(e) => setSelectedCommitteeMember({
+                          ...selectedCommitteeMember,
+                          name: { ...selectedCommitteeMember.name, en: e.target.value }
+                        })}
+                        placeholder={t({ en: 'Enter name in English', mr: 'इंग्रजीत नाव टाका' })}
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit-name-mr" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Name (Marathi)', mr: 'नाव (मराठी)' })}
+                      </Label>
+                      <Input
+                        id="edit-name-mr"
+                        value={selectedCommitteeMember.name?.mr || ''}
+                        onChange={(e) => setSelectedCommitteeMember({
+                          ...selectedCommitteeMember,
+                          name: { ...selectedCommitteeMember.name, mr: e.target.value }
+                        })}
+                        placeholder={t({ en: 'मराठीत नाव टाका', mr: 'मराठीत नाव टाका' })}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-position-en" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Position (English)', mr: 'पद (इंग्रजी)' })} <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="edit-position-en"
+                        value={selectedCommitteeMember.position?.en || ''}
+                        onChange={(e) => setSelectedCommitteeMember({
+                          ...selectedCommitteeMember,
+                          position: { ...selectedCommitteeMember.position, en: e.target.value }
+                        })}
+                        placeholder={t({ en: 'e.g., Ward Member', mr: 'जसे, वार्ड सदस्य' })}
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit-position-mr" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Position (Marathi)', mr: 'पद (मराठी)' })}
+                      </Label>
+                      <Input
+                        id="edit-position-mr"
+                        value={selectedCommitteeMember.position?.mr || ''}
+                        onChange={(e) => setSelectedCommitteeMember({
+                          ...selectedCommitteeMember,
+                          position: { ...selectedCommitteeMember.position, mr: e.target.value }
+                        })}
+                        placeholder={t({ en: 'जसे, वार्ड सदस्य', mr: 'जसे, वार्ड सदस्य' })}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-ward" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Ward/Department', mr: 'वार्ड/विभाग' })}
+                      </Label>
+                      <Input
+                        id="edit-ward"
+                        value={selectedCommitteeMember.ward || ''}
+                        onChange={(e) => setSelectedCommitteeMember({
+                          ...selectedCommitteeMember,
+                          ward: e.target.value
+                        })}
+                        placeholder={t({ en: 'e.g., Ward 1 or Administrative', mr: 'जसे, वार्ड 1 किंवा प्रशासकीय' })}
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit-phone" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Phone', mr: 'फोन' })} <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        id="edit-phone"
+                        value={selectedCommitteeMember.phone || ''}
+                        onChange={(e) => setSelectedCommitteeMember({
+                          ...selectedCommitteeMember,
+                          phone: e.target.value
+                        })}
+                        placeholder={t({ en: '+91 9876543210', mr: '+91 9876543210' })}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="edit-email" className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Email', mr: 'ईमेल' })}
+                    </Label>
+                    <Input
+                      id="edit-email"
+                      type="email"
+                      value={selectedCommitteeMember.email || ''}
+                      onChange={(e) => setSelectedCommitteeMember({
+                        ...selectedCommitteeMember,
+                        email: e.target.value
+                      })}
+                      placeholder={t({ en: 'email@example.com', mr: 'email@example.com' })}
+                      className="mt-1"
+                    />
+                  </div>
+                </div>
+
+                {/* Dates */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                    {t({ en: 'Term Information', mr: 'कार्यकाळ माहिती' })}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-join-date" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Join Date', mr: 'सामील होण्याची तारीख' })}
+                      </Label>
+                      <div className="relative mt-1">
+                        <Input
+                          id="edit-join-date"
+                          type="date"
+                          value={selectedCommitteeMember.joinDate ? selectedCommitteeMember.joinDate.split('T')[0] : ''}
+                          onChange={(e) => setSelectedCommitteeMember({
+                            ...selectedCommitteeMember,
+                            joinDate: e.target.value
+                          })}
+                          className="pr-10"
+                        />
+                        <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit-term-end" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Term End Date', mr: 'कार्यकाळ संपण्याची तारीख' })}
+                      </Label>
+                      <div className="relative mt-1">
+                        <Input
+                          id="edit-term-end"
+                          type="date"
+                          value={selectedCommitteeMember.termEnd ? selectedCommitteeMember.termEnd.split('T')[0] : ''}
+                          onChange={(e) => setSelectedCommitteeMember({
+                            ...selectedCommitteeMember,
+                            termEnd: e.target.value
+                          })}
+                          className="pr-10"
+                        />
+                        <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-sm font-medium text-gray-700">
+                      {t({ en: 'Status', mr: 'स्थिती' })}
+                    </Label>
+                    <div className="mt-1">
+                      <Select
+                        value={selectedCommitteeMember.isActive ? 'active' : 'inactive'}
+                        onValueChange={(value) => setSelectedCommitteeMember({
+                          ...selectedCommitteeMember,
+                          isActive: value === 'active'
+                        })}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">{t({ en: 'Active', mr: 'सक्रिय' })}</SelectItem>
+                          <SelectItem value="inactive">{t({ en: 'Inactive', mr: 'निष्क्रिय' })}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Education and Experience */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                    {t({ en: 'Background Information', mr: 'पार्श्वभूमी माहिती' })}
+                  </h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor="edit-education-en" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Education (English)', mr: 'शिक्षण (इंग्रजी)' })}
+                      </Label>
+                      <Input
+                        id="edit-education-en"
+                        value={selectedCommitteeMember.education?.en || ''}
+                        onChange={(e) => setSelectedCommitteeMember({
+                          ...selectedCommitteeMember,
+                          education: { ...selectedCommitteeMember.education, en: e.target.value }
+                        })}
+                        placeholder={t({ en: 'Educational qualifications', mr: 'शैक्षणिक पात्रता' })}
+                        className="mt-1"
+                      />
+                    </div>
+                    
+                    <div>
+                      <Label htmlFor="edit-experience-en" className="text-sm font-medium text-gray-700">
+                        {t({ en: 'Experience (English)', mr: 'अनुभव (इंग्रजी)' })}
+                      </Label>
+                      <Input
+                        id="edit-experience-en"
+                        value={selectedCommitteeMember.experience?.en || ''}
+                        onChange={(e) => setSelectedCommitteeMember({
+                          ...selectedCommitteeMember,
+                          experience: { ...selectedCommitteeMember.experience, en: e.target.value }
+                        })}
+                        placeholder={t({ en: 'Professional experience', mr: 'व्यावसायिक अनुभव' })}
+                        className="mt-1"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end space-x-3 pt-6 border-t">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditCommitteeMemberOpen(false);
+                      setSelectedCommitteeMember(null);
+                    }}
+                    className="px-6 py-2"
+                  >
+                    {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                  </Button>
+                  <Button
+                    onClick={handleUpdateCommitteeMember}
+                    className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2"
+                  >
+                    <Save className="h-4 w-4 mr-2" />
+                    {t({ en: 'Save Changes', mr: 'बदल जतन करा' })}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Office Hours Management Modal */}
+        <Dialog open={isOfficeHoursEditOpen} onOpenChange={setIsOfficeHoursEditOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="text-2xl font-bold text-gray-900">
+                {t({ en: 'Manage Office Hours', mr: 'कार्यालयीन वेळा व्यवस्थापित करा' })}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-6 py-4">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                  {t({ en: 'Weekly Schedule', mr: 'साप्ताहिक वेळापत्रक' })}
+                </h3>
+                
+                <div className="space-y-4">
+                  {officeInfo?.officeHours && officeInfo.officeHours.length > 0 ? (
+                    officeInfo.officeHours.map((schedule, index) => (
+                      <div key={index} className="grid grid-cols-1 lg:grid-cols-5 gap-4 p-4 border border-gray-200 rounded-lg">
+                        <div className="flex items-center">
+                          <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                            <Calendar className="h-4 w-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <p className="font-medium text-gray-900">{schedule.day?.en || ''}</p>
+                            <p className="text-sm text-gray-600">{schedule.day?.mr || ''}</p>
+                          </div>
+                        </div>
+                        
+                        <div className="lg:col-span-2">
+                          <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                            {t({ en: 'Office Hours', mr: 'कार्यालयीन वेळा' })}
+                          </Label>
+                          {schedule.available ? (
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                value={schedule.hours || ''}
+                                onChange={(e) => {
+                                  const updatedHours = [...officeInfo.officeHours];
+                                  updatedHours[index].hours = e.target.value;
+                                  setOfficeInfo({
+                                    ...officeInfo,
+                                    officeHours: updatedHours
+                                  });
+                                }}
+                                placeholder={t({ en: 'e.g., 9:00 AM - 5:00 PM', mr: 'जसे, 9:00 AM - 5:00 PM' })}
+                                className="text-sm"
+                              />
+                            </div>
+                          ) : (
+                            <div className="flex items-center space-x-2">
+                              <Input
+                                value="Closed"
+                                disabled
+                                className="text-sm bg-gray-100 text-gray-500"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div>
+                          <Label className="text-sm font-medium text-gray-700 mb-2 block">
+                            {t({ en: 'Status', mr: 'स्थिती' })}
+                          </Label>
+                          <Badge 
+                            variant={schedule.available ? 'default' : 'secondary'}
+                            className={`font-medium ${schedule.available ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}
+                          >
+                            {schedule.available 
+                              ? t({ en: 'Open', mr: 'उघडे' })
+                              : t({ en: 'Closed', mr: 'बंद' })
+                            }
+                          </Badge>
+                        </div>
+                        
+                        <div className="flex items-center justify-end space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              // Toggle availability
+                              const updatedHours = [...officeInfo.officeHours];
+                              updatedHours[index].available = !updatedHours[index].available;
+                              // Set default hours when opening
+                              if (!updatedHours[index].available) {
+                                updatedHours[index].hours = 'Closed';
+                              } else if (updatedHours[index].hours === 'Closed' || !updatedHours[index].hours) {
+                                // Set default hours based on day
+                                if (updatedHours[index].day?.en === 'Saturday') {
+                                  updatedHours[index].hours = '10:00 AM - 2:00 PM';
+                                } else if (updatedHours[index].day?.en === 'Sunday') {
+                                  updatedHours[index].hours = 'Closed';
+                                  updatedHours[index].available = false;
+                                } else {
+                                  updatedHours[index].hours = '9:00 AM - 5:00 PM';
+                                }
+                              }
+                              setOfficeInfo({
+                                ...officeInfo,
+                                officeHours: updatedHours
+                              });
+                            }}
+                            className={schedule.available ? "hover:bg-red-50 hover:border-red-300" : "hover:bg-green-50 hover:border-green-300"}
+                          >
+                            {schedule.available ? (
+                              <>
+                                <X className="h-4 w-4 mr-1" />
+                                {t({ en: 'Close', mr: 'बंद करा' })}
+                              </>
+                            ) : (
+                              <>
+                                <Check className="h-4 w-4 mr-1" />
+                                {t({ en: 'Open', mr: 'उघडा' })}
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Calendar className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <p className="text-gray-500 mb-4">
+                        {t({ en: 'No office hours configured', mr: 'कोणतेही कार्यालयीन वेळा सेट केले नाहीत' })}
+                      </p>
+                      <Button 
+                        onClick={() => {
+                          // Create default office hours
+                          const defaultHours = [
+                            { day: { en: 'Monday', mr: 'सोमवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                            { day: { en: 'Tuesday', mr: 'मंगळवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                            { day: { en: 'Wednesday', mr: 'बुधवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                            { day: { en: 'Thursday', mr: 'गुरुवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                            { day: { en: 'Friday', mr: 'शुक्रवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                            { day: { en: 'Saturday', mr: 'शनिवार' }, hours: '10:00 AM - 2:00 PM', available: true },
+                            { day: { en: 'Sunday', mr: 'रविवार' }, hours: 'Closed', available: false }
+                          ];
+                          setOfficeInfo({
+                            ...officeInfo,
+                            officeHours: defaultHours
+                          });
+                        }}
+                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t({ en: 'Add Default Hours', mr: 'डिफॉल्ट वेळा जोडा' })}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">
+                  {t({ en: 'Quick Actions', mr: 'त्वरित क्रिया' })}
+                </h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const updatedHours = officeInfo.officeHours.map(hour => {
+                        if (hour.day?.en === 'Saturday') {
+                          return { ...hour, available: true, hours: '10:00 AM - 2:00 PM' };
+                        } else if (hour.day?.en === 'Sunday') {
+                          return { ...hour, available: false, hours: 'Closed' };
+                        } else {
+                          return { ...hour, available: true, hours: '9:00 AM - 5:00 PM' };
+                        }
+                      });
+                      setOfficeInfo({
+                        ...officeInfo,
+                        officeHours: updatedHours
+                      });
+                    }}
+                    className="hover:bg-green-50 hover:border-green-300"
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    {t({ en: 'Set Standard Hours', mr: 'मानक वेळा सेट करा' })}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const updatedHours = officeInfo.officeHours.map(hour => ({
+                        ...hour,
+                        available: true,
+                        hours: hour.hours === 'Closed' ? '9:00 AM - 5:00 PM' : hour.hours
+                      }));
+                      setOfficeInfo({
+                        ...officeInfo,
+                        officeHours: updatedHours
+                      });
+                    }}
+                    className="hover:bg-blue-50 hover:border-blue-300"
+                  >
+                    <Check className="h-4 w-4 mr-2" />
+                    {t({ en: 'Open All Days', mr: 'सर्व दिवस उघडा' })}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      const updatedHours = officeInfo.officeHours.map(hour => ({
+                        ...hour,
+                        available: false,
+                        hours: 'Closed'
+                      }));
+                      setOfficeInfo({
+                        ...officeInfo,
+                        officeHours: updatedHours
+                      });
+                    }}
+                    className="hover:bg-red-50 hover:border-red-300"
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    {t({ en: 'Close All Days', mr: 'सर्व दिवस बंद करा' })}
+                  </Button>
+                  
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      // Reset to default hours
+                      const defaultHours = [
+                        { day: { en: 'Monday', mr: 'सोमवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                        { day: { en: 'Tuesday', mr: 'मंगळवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                        { day: { en: 'Wednesday', mr: 'बुधवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                        { day: { en: 'Thursday', mr: 'गुरुवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                        { day: { en: 'Friday', mr: 'शुक्रवार' }, hours: '9:00 AM - 5:00 PM', available: true },
+                        { day: { en: 'Saturday', mr: 'शनिवार' }, hours: '10:00 AM - 2:00 PM', available: true },
+                        { day: { en: 'Sunday', mr: 'रविवार' }, hours: 'Closed', available: false }
+                      ];
+                      setOfficeInfo({
+                        ...officeInfo,
+                        officeHours: defaultHours
+                      });
+                    }}
+                    className="hover:bg-purple-50 hover:border-purple-300"
+                  >
+                    <Calendar className="h-4 w-4 mr-2" />
+                    {t({ en: 'Reset to Default', mr: 'डिफॉल्ट वर रीसेट करा' })}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3 pt-6 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsOfficeHoursEditOpen(false)}
+                  className="px-6 py-2"
+                >
+                  {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                </Button>
+                <Button
+                  onClick={async () => {
+                    try {
+                      await adminUpdateOfficeInfo(officeInfo);
+                      toast.success('Office hours updated successfully');
+                      setIsOfficeHoursEditOpen(false);
+                    } catch (error) {
+                      console.error('Failed to update office hours:', error);
+                      toast.error('Failed to update office hours');
+                    }
+                  }}
+                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2"
+                >
+                  <Save className="h-4 w-4 mr-2" />
+                  {t({ en: 'Save Changes', mr: 'बदल जतन करा' })}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Media Modal */}
+        <Dialog open={isAddMediaOpen} onOpenChange={setIsAddMediaOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle>{t({ en: 'Add New Media', mr: 'नवीन मीडिया जोडा' })}</DialogTitle>
+            <DialogDescription>
+              {t({ en: 'Upload and add new media items to your village gallery', mr: 'आपल्या गाव गॅलरीमध्ये नवीन मीडिया आयटम अपलोड आणि जोडा' })}
+            </DialogDescription>
+            
+            <div className="space-y-6">
+              {/* Media Type */}
+              <div className="space-y-2">
+                <Label>{t({ en: 'Media Type', mr: 'मीडिया प्रकार' })}</Label>
+                <Select 
+                  value={newMediaItem.mediaType} 
+                  onValueChange={(value) => setNewMediaItem(prev => ({ ...prev, mediaType: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Photo">{t({ en: 'Photo', mr: 'फोटो' })}</SelectItem>
+                    <SelectItem value="Video">{t({ en: 'Video', mr: 'व्हिडिओ' })}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* File Upload */}
+              <div className="space-y-2">
+                <Label>{t({ en: 'Upload File', mr: 'फाइल अपलोड करा' })}</Label>
+                <Input
+                  type="file"
+                  accept={newMediaItem.mediaType === 'Photo' ? 'image/*' : 'video/*'}
+                  onChange={handleFileUpload}
+                  disabled={uploading}
+                />
+                {uploading && (
+                  <p className="text-sm text-blue-600">{t({ en: 'Uploading...', mr: 'अपलोड होत आहे...' })}</p>
+                )}
+                {newMediaItem.fileUrl && (
+                  <div className="mt-2">
+                    {newMediaItem.mediaType === 'Photo' ? (
+                      <img src={newMediaItem.fileUrl} alt="Preview" className="w-32 h-32 object-cover rounded-lg" />
+                    ) : (
+                      <video src={newMediaItem.fileUrl} className="w-32 h-32 object-cover rounded-lg" controls />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Title */}
+              <div className="space-y-2">
+                <Label>{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })} *</Label>
+                <Input
+                  value={newMediaItem.title.en}
+                  onChange={(e) => setNewMediaItem(prev => ({ 
+                    ...prev, 
+                    title: { ...prev.title, en: e.target.value }
+                  }))}
+                  placeholder={t({ en: 'Enter title in English', mr: 'इंग्रजीत शीर्षक प्रविष्ट करा' })}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</Label>
+                <Input
+                  value={newMediaItem.title.mr}
+                  onChange={(e) => setNewMediaItem(prev => ({ 
+                    ...prev, 
+                    title: { ...prev.title, mr: e.target.value }
+                  }))}
+                  placeholder={t({ en: 'Enter title in Marathi', mr: 'मराठीत शीर्षक प्रविष्ट करा' })}
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-2">
+                <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                <Textarea
+                  value={newMediaItem.description.en}
+                  onChange={(e) => setNewMediaItem(prev => ({ 
+                    ...prev, 
+                    description: { ...prev.description, en: e.target.value }
+                  }))}
+                  placeholder={t({ en: 'Enter description in English', mr: 'इंग्रजीत वर्णन प्रविष्ट करा' })}
+                  rows={3}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                <Textarea
+                  value={newMediaItem.description.mr}
+                  onChange={(e) => setNewMediaItem(prev => ({ 
+                    ...prev, 
+                    description: { ...prev.description, mr: e.target.value }
+                  }))}
+                  placeholder={t({ en: 'Enter description in Marathi', mr: 'मराठीत वर्णन प्रविष्ट करा' })}
+                  rows={3}
+                />
+              </div>
+
+              {/* Category */}
+              <div className="space-y-2">
+                <Label>{t({ en: 'Category', mr: 'श्रेणी' })} *</Label>
+                <Select 
+                  value={newMediaItem.category} 
+                  onValueChange={(value) => setNewMediaItem(prev => ({ ...prev, category: value }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={t({ en: 'Select a category', mr: 'श्रेणी निवडा' })} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {mediaCategories.map((category) => (
+                      <SelectItem key={category._id} value={category._id}>
+                        {category.name.en}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Tags */}
+              <div className="space-y-2">
+                <Label>{t({ en: 'Tags', mr: 'टॅग' })}</Label>
+                <Input
+                  value={newMediaItem.tags.join(', ')}
+                  onChange={(e) => setNewMediaItem(prev => ({ 
+                    ...prev, 
+                    tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)
+                  }))}
+                  placeholder={t({ en: 'Enter tags separated by commas', mr: 'स्वल्पविरामाने विभक्त टॅग प्रविष्ट करा' })}
+                />
+              </div>
+
+              {/* Featured Checkbox */}
+              <div className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id="isFeatured"
+                  checked={newMediaItem.isFeatured}
+                  onChange={(e) => setNewMediaItem(prev => ({ ...prev, isFeatured: e.target.checked }))}
+                  className="rounded"
+                />
+                <Label htmlFor="isFeatured">{t({ en: 'Mark as Featured', mr: 'विशेष म्हणून चिन्हांकित करा' })}</Label>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex justify-end gap-3 pt-4">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsAddMediaOpen(false)}
+                  disabled={uploading}
+                >
+                  {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                </Button>
+                <Button
+                  onClick={handleAddMediaSubmit}
+                  disabled={uploading || !newMediaItem.title.en || !newMediaItem.category || !newMediaItem.fileUrl}
+                  className="bg-indigo-600 hover:bg-indigo-700"
+                >
+                  {uploading ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      {t({ en: 'Uploading...', mr: 'अपलोड होत आहे...' })}
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t({ en: 'Add Media', mr: 'मीडिया जोडा' })}
+                    </>
+                  )}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Media Modal */}
+        <Dialog open={isEditMediaOpen} onOpenChange={setIsEditMediaOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle>{t({ en: 'Edit Media', mr: 'मीडिया संपादित करा' })}</DialogTitle>
+            <DialogDescription>
+              {t({ en: 'Update media item details and information', mr: 'मीडिया आयटम तपशील आणि माहिती अपडेट करा' })}
+            </DialogDescription>
+            
+            {selectedMedia && (
+              <div className="space-y-6">
+                {/* Media Type */}
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Media Type', mr: 'मीडिया प्रकार' })}</Label>
+                  <Select 
+                    value={selectedMedia.mediaType} 
+                    onValueChange={(value) => setSelectedMedia(prev => ({ ...prev, mediaType: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Photo">{t({ en: 'Photo', mr: 'फोटो' })}</SelectItem>
+                      <SelectItem value="Video">{t({ en: 'Video', mr: 'व्हिडिओ' })}</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Current Media Preview */}
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Current Media', mr: 'सध्याचे मीडिया' })}</Label>
+                  <div className="w-32 h-32 rounded-lg overflow-hidden bg-gray-100">
+                    {selectedMedia.thumbnailUrl ? (
+                      <img 
+                        src={selectedMedia.thumbnailUrl} 
+                        alt={selectedMedia.title.en}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : selectedMedia.mediaType === 'Photo' ? (
+                      <img 
+                        src={selectedMedia.fileUrl} 
+                        alt={selectedMedia.title.en}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center bg-gray-200">
+                        <Video className="h-6 w-6 text-gray-400" />
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Title */}
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })} *</Label>
+                  <Input
+                    value={selectedMedia.title.en}
+                    onChange={(e) => setSelectedMedia(prev => ({ 
+                      ...prev, 
+                      title: { ...prev.title, en: e.target.value }
+                    }))}
+                    placeholder={t({ en: 'Enter title in English', mr: 'इंग्रजीत शीर्षक प्रविष्ट करा' })}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</Label>
+                  <Input
+                    value={selectedMedia.title.mr || ''}
+                    onChange={(e) => setSelectedMedia(prev => ({ 
+                      ...prev, 
+                      title: { ...prev.title, mr: e.target.value }
+                    }))}
+                    placeholder={t({ en: 'Enter title in Marathi', mr: 'मराठीत शीर्षक प्रविष्ट करा' })}
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                  <Textarea
+                    value={selectedMedia.description?.en || ''}
+                    onChange={(e) => setSelectedMedia(prev => ({ 
+                      ...prev, 
+                      description: { ...prev.description, en: e.target.value }
+                    }))}
+                    placeholder={t({ en: 'Enter description in English', mr: 'इंग्रजीत वर्णन प्रविष्ट करा' })}
+                    rows={3}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                  <Textarea
+                    value={selectedMedia.description?.mr || ''}
+                    onChange={(e) => setSelectedMedia(prev => ({ 
+                      ...prev, 
+                      description: { ...prev.description, mr: e.target.value }
+                    }))}
+                    placeholder={t({ en: 'Enter description in Marathi', mr: 'मराठीत वर्णन प्रविष्ट करा' })}
+                    rows={3}
+                  />
+                </div>
+
+                {/* Category */}
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Category', mr: 'श्रेणी' })} *</Label>
+                  <Select 
+                    value={selectedMedia.category} 
+                    onValueChange={(value) => setSelectedMedia(prev => ({ ...prev, category: value }))}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={t({ en: 'Select a category', mr: 'श्रेणी निवडा' })} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {mediaCategories.map((category) => (
+                        <SelectItem key={category._id} value={category._id}>
+                          {category.name.en}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Tags */}
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Tags', mr: 'टॅग' })}</Label>
+                  <Input
+                    value={selectedMedia.tags?.join(', ') || ''}
+                    onChange={(e) => setSelectedMedia(prev => ({ 
+                      ...prev, 
+                      tags: e.target.value.split(',').map(tag => tag.trim()).filter(tag => tag)
+                    }))}
+                    placeholder={t({ en: 'Enter tags separated by commas', mr: 'स्वल्पविरामाने विभक्त टॅग प्रविष्ट करा' })}
+                  />
+                </div>
+
+                {/* Featured Checkbox */}
+                <div className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id="editIsFeatured"
+                    checked={selectedMedia.isFeatured || false}
+                    onChange={(e) => setSelectedMedia(prev => ({ ...prev, isFeatured: e.target.checked }))}
+                    className="rounded"
+                  />
+                  <Label htmlFor="editIsFeatured">{t({ en: 'Mark as Featured', mr: 'विशेष म्हणून चिन्हांकित करा' })}</Label>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-end gap-3 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditMediaOpen(false);
+                      setSelectedMedia(null);
+                    }}
+                  >
+                    {t({ en: 'Cancel', mr: 'रद्द करा' })}
+                  </Button>
+                  <Button
+                    onClick={handleUpdateMedia}
+                    disabled={!selectedMedia.title.en || !selectedMedia.category}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Edit className="h-4 w-4 mr-2" />
+                    {t({ en: 'Update Media', mr: 'मीडिया अपडेट करा' })}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Category Management Modal */}
+        <Dialog open={isCategoryModalOpen} onOpenChange={setIsCategoryModalOpen}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogTitle>{t({ en: 'Manage Media Categories', mr: 'मीडिया श्रेण्या व्यवस्थापित करा' })}</DialogTitle>
+            <DialogDescription>
+              {t({ en: 'Add, edit, and delete media categories for organizing your content', mr: 'आपली सामग्री व्यवस्थापित करण्यासाठी मीडिया श्रेण्या जोडा, संपादित करा आणि हटवा' })}
+            </DialogDescription>
+            
+            <div className="space-y-6">
+              {/* Add New Category Form */}
+              <div className="border rounded-lg p-4 bg-gray-50">
+                <h3 className="text-lg font-semibold mb-4">{t({ en: 'Add New Category', mr: 'नवीन श्रेणी जोडा' })}</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Category Name (English)', mr: 'श्रेणी नाव (इंग्रजी)' })} *</Label>
+                    <Input
+                      value={newMediaCategory.name.en}
+                      onChange={(e) => setNewMediaCategory(prev => ({ 
+                        ...prev, 
+                        name: { ...prev.name, en: e.target.value }
+                      }))}
+                      placeholder={t({ en: 'Enter category name in English', mr: 'इंग्रजीत श्रेणी नाव प्रविष्ट करा' })}
+                    />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Category Name (Marathi)', mr: 'श्रेणी नाव (मराठी)' })} *</Label>
+                    <Input
+                      value={newMediaCategory.name.mr}
+                      onChange={(e) => setNewMediaCategory(prev => ({ 
+                        ...prev, 
+                        name: { ...prev.name, mr: e.target.value }
+                      }))}
+                      placeholder={t({ en: 'Enter category name in Marathi', mr: 'मराठीत श्रेणी नाव प्रविष्ट करा' })}
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end mt-4">
+                  <Button
+                    onClick={handleAddCategory}
+                    disabled={!newMediaCategory.name.en || !newMediaCategory.name.mr}
+                    className="bg-indigo-600 hover:bg-indigo-700"
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    {t({ en: 'Add Category', mr: 'श्रेणी जोडा' })}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Existing Categories List */}
+              <div>
+                <h3 className="text-lg font-semibold mb-4">{t({ en: 'Existing Categories', mr: 'अस्तित्वातील श्रेण्या' })}</h3>
+                
+                {mediaCategories.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500">
+                    <Folder className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                    <p>{t({ en: 'No categories found', mr: 'कोणतीही श्रेणी सापडली नाही' })}</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {mediaCategories.map((category) => (
+                      <div key={category._id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                        <div className="flex-1">
+                          <div className="font-medium">{category.name.en}</div>
+                          {category.name.mr && (
+                            <div className="text-sm text-gray-600">{category.name.mr}</div>
+                          )}
+                          <div className="text-xs text-gray-500 mt-1">
+                            {t({ en: 'Created', mr: 'तयार केले' })}: {new Date(category.createdAt).toLocaleDateString()}
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className="text-xs">
+                            {category.mediaCount || 0} {t({ en: 'items', mr: 'आयटम' })}
+                          </Badge>
+                          
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="text-red-600 hover:text-red-700"
+                            onClick={() => handleDeleteCategory(category._id)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Close Button */}
+              <div className="flex justify-end pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setIsCategoryModalOpen(false)}
+                >
+                  {t({ en: 'Close', mr: 'बंद करा' })}
+                </Button>
+              </div>
+            </div>
           </DialogContent>
         </Dialog>
 

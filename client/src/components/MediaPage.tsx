@@ -1,9 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { useLanguage } from './LanguageProvider';
+import { getPublicMedia, getPublicCategories, incrementMediaViews } from '../services/mediaService';
 import { 
   Camera, 
   Video, 
@@ -17,121 +19,216 @@ import {
   List,
   Eye,
   Heart,
-  MoreHorizontal
+  MoreHorizontal,
+  X,
+  ExternalLink
 } from 'lucide-react';
 
 export function MediaPage() {
   const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('photos');
   const [viewMode, setViewMode] = useState('grid');
-
-  const mediaCategories = [
-    { id: 'all', label: { en: 'All Media', mr: 'सर्व मीडिया' }, count: 48 },
-    { id: 'festivals', label: { en: 'Festivals', mr: 'सण-उत्सव' }, count: 15 },
-    { id: 'development', label: { en: 'Development', mr: 'विकास' }, count: 12 },
-    { id: 'education', label: { en: 'Education', mr: 'शिक्षण' }, count: 8 },
-    { id: 'agriculture', label: { en: 'Agriculture', mr: 'शेती' }, count: 10 },
-    { id: 'events', label: { en: 'Events', mr: 'कार्यक्रम' }, count: 3 }
-  ];
-
-  const photos = [
-    {
-      id: 1,
-      title: { en: 'Ganesh Festival Celebration', mr: 'गणेश उत्सव साजरा' },
-      description: { en: 'Annual Ganesh festival celebrated with great enthusiasm', mr: 'वार्षिक गणेश उत्सव मोठ्या उत्साहाने साजरा केला' },
-      image: 'https://images.unsplash.com/photo-1745988583865-2249654d864c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZmVzdGl2YWwlMjBjZWxlYnJhdGlvbnxlbnwxfHx8fDE3NTU0NTU0NjR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'festivals',
-      date: '2024-08-25',
-      views: 245,
-      likes: 32
-    },
-    {
-      id: 2,
-      title: { en: 'New Road Construction', mr: 'नवीन रस्ता बांधकाम' },
-      description: { en: 'Construction of new concrete road connecting to main highway', mr: 'मुख्य महामार्गाला जोडणारा नवीन काँक्रीट रस्ता बांधकाम' },
-      image: 'https://images.unsplash.com/photo-1683633570715-dce2fd5dfe90?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjBydXJhbCUyMGRldmVsb3BtZW50JTIwY29uc3RydWN0aW9ufGVufDF8fHx8MTc1NTQ1NTQ2OHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'development',
-      date: '2024-07-15',
-      views: 189,
-      likes: 28
-    },
-    {
-      id: 3,
-      title: { en: 'School Children Learning', mr: 'शाळकरी मुले शिकताना' },
-      description: { en: 'Students engaged in interactive learning at village school', mr: 'गावातील शाळेत विद्यार्थी संवादात्मक शिक्षणात गुंतलेले' },
-      image: 'https://images.unsplash.com/photo-1600792174277-8d734290a61f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZWR1Y2F0aW9uJTIwc2Nob29sJTIwY2hpbGRyZW58ZW58MXx8fHwxNzU1NDU1NDc1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'education',
-      date: '2024-06-10',
-      views: 156,
-      likes: 45
-    },
-    {
-      id: 4,
-      title: { en: 'Farmers Market Day', mr: 'शेतकरी बाजार दिवस' },
-      description: { en: 'Weekly farmers market showcasing local produce', mr: 'स्थानिक उत्पादनांचे प्रदर्शन करणारा साप्ताहिक शेतकरी बाजार' },
-      image: 'https://images.unsplash.com/photo-1745988583865-2249654d864c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZmVzdGl2YWwlMjBjZWxlYnJhdGlvbnxlbnwxfHx8fDE3NTU0NTU0NjR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'agriculture',
-      date: '2024-05-20',
-      views: 134,
-      likes: 19
-    },
-    {
-      id: 5,
-      title: { en: 'Independence Day Celebration', mr: 'स्वातंत्र्य दिन साजरा' },
-      description: { en: 'Village celebrates 77th Independence Day with patriotic fervor', mr: 'गावाने ७७ वा स्वातंत्र्य दिन देशभक्तीच्या उत्साहाने साजरा केला' },
-      image: 'https://images.unsplash.com/photo-1683633570715-dce2fd5dfe90?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjBydXJhbCUyMGRldmVsb3BtZW50JTIwY29uc3RydWN0aW9ufGVufDF8fHx8MTc1NTQ1NTQ2OHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'events',
-      date: '2024-08-15',
-      views: 298,
-      likes: 67
-    },
-    {
-      id: 6,
-      title: { en: 'Water Harvesting Project', mr: 'जल संधारण प्रकल्प' },
-      description: { en: 'Community rainwater harvesting system installation', mr: 'सामुदायिक पावसाळी पाणी संधारण प्रणाली स्थापना' },
-      image: 'https://images.unsplash.com/photo-1600792174277-8d734290a61f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZWR1Y2F0aW9uJTIwc2Nob29sJTIwY2hpbGRyZW58ZW58MXx8fHwxNzU1NDU1NDc1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      category: 'development',
-      date: '2024-04-08',
-      views: 212,
-      likes: 34
-    }
-  ];
-
-  const videos = [
-    {
-      id: 1,
-      title: { en: 'Village Development Documentary', mr: 'गाव विकास माहितीपट' },
-      description: { en: '10-minute documentary showcasing village transformation', mr: 'गावातील परिवर्तन दाखवणारा १० मिनिटांचा माहितीपट' },
-      thumbnail: 'https://images.unsplash.com/photo-1683633570715-dce2fd5dfe90?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjBydXJhbCUyMGRldmVsb3BtZW50JTIwY29uc3RydWN0aW9ufGVufDF8fHx8MTc1NTQ1NTQ2OHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      duration: '10:23',
-      views: 1240,
-      date: '2024-07-20'
-    },
-    {
-      id: 2,
-      title: { en: 'Ganesh Festival Highlights', mr: 'गणेश उत्सव ठळक' },
-      description: { en: 'Best moments from the annual Ganesh festival celebration', mr: 'वार्षिक गणेश उत्सव साजरीकरणातील सर्वोत्तम क्षण' },
-      thumbnail: 'https://images.unsplash.com/photo-1745988583865-2249654d864c?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZmVzdGl2YWwlMjBjZWxlYnJhdGlvbnxlbnwxfHx8fDE3NTU0NTU0NjR8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      duration: '5:45',
-      views: 892,
-      date: '2024-08-28'
-    },
-    {
-      id: 3,
-      title: { en: 'Digital Literacy Program', mr: 'डिजिटल साक्षरता कार्यक्रम' },
-      description: { en: 'Teaching digital skills to village women and elderly', mr: 'गावातील महिला आणि वयोवृद्धांना डिजिटल कौशल्य शिकवणे' },
-      thumbnail: 'https://images.unsplash.com/photo-1600792174277-8d734290a61f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZWR1Y2F0aW9uJTIwc2Nob29sJTIwY2hpbGRyZW58ZW58MXx8fHwxNzU1NDU1NDc1fDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      duration: '7:12',
-      views: 567,
-      date: '2024-06-15'
-    }
-  ];
-
+  const [mediaCategories, setMediaCategories] = useState([]);
+  const [photos, setPhotos] = useState([]);
+  const [videos, setVideos] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('all');
+  const [loading, setLoading] = useState(true);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [imageLoading, setImageLoading] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
-  const filteredPhotos = selectedCategory === 'all' 
-    ? photos 
-    : photos.filter(photo => photo.category === selectedCategory);
+  // Fetch initial data on component mount
+  useEffect(() => {
+    const fetchInitialData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch categories
+        const categoriesRes = await getPublicCategories();
+        setMediaCategories(categoriesRes.data);
+        
+        // Fetch photos
+        const photosRes = await getPublicMedia({ mediaType: 'Photo' });
+        setPhotos(photosRes.data);
+        
+        // Fetch videos
+        const videosRes = await getPublicMedia({ mediaType: 'Video' });
+        setVideos(videosRes.data);
+        
+      } catch (error) {
+        console.error('Failed to fetch media data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInitialData();
+  }, []);
+
+  // Dynamic filtering based on selected category
+  useEffect(() => {
+    const fetchFilteredData = async () => {
+      if (selectedCategory === 'all') {
+        // If "all" is selected, fetch all media of the current type
+        try {
+          const mediaType = activeTab === 'photos' ? 'Photo' : 'Video';
+          const response = await getPublicMedia({ mediaType });
+          
+          if (activeTab === 'photos') {
+            setPhotos(response.data);
+          } else {
+            setVideos(response.data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch filtered media:', error);
+        }
+      } else {
+        // If a specific category is selected, fetch media filtered by category
+        try {
+          const mediaType = activeTab === 'photos' ? 'Photo' : 'Video';
+          const response = await getPublicMedia({ 
+            mediaType, 
+            category: selectedCategory 
+          });
+          
+          if (activeTab === 'photos') {
+            setPhotos(response.data);
+          } else {
+            setVideos(response.data);
+          }
+        } catch (error) {
+          console.error('Failed to fetch filtered media:', error);
+        }
+      }
+    };
+
+    fetchFilteredData();
+  }, [selectedCategory, activeTab]);
+
+  // Handle media item click to open modal
+  const handleMediaClick = async (mediaItem) => {
+    console.log('Opening media item:', mediaItem);
+    console.log('Media URL:', mediaItem.fileUrl);
+    console.log('Media Type:', mediaItem.mediaType);
+    
+    setSelectedMedia(mediaItem);
+    setIsModalOpen(true);
+    setImageLoading(true);
+    setImageError(false);
+    
+    // Increment view count
+    try {
+      await incrementMediaViews(mediaItem._id);
+      // Update local state to reflect the new view count
+      if (activeTab === 'photos') {
+        setPhotos(prev => prev.map(item => 
+          item._id === mediaItem._id 
+            ? { ...item, views: item.views + 1 }
+            : item
+        ));
+      } else {
+        setVideos(prev => prev.map(item => 
+          item._id === mediaItem._id 
+            ? { ...item, views: item.views + 1 }
+            : item
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to increment views:', error);
+    }
+  };
+
+  // Handle download
+  const handleDownload = async (mediaItem) => {
+    try {
+      console.log('Starting download for:', mediaItem.fileUrl);
+      
+      // For Unsplash URLs, we need to handle them differently
+      if (mediaItem.fileUrl.includes('unsplash.com')) {
+        // Open in new tab for Unsplash images (they have CORS restrictions)
+        window.open(mediaItem.fileUrl, '_blank');
+        return;
+      }
+      
+      const response = await fetch(mediaItem.fileUrl, {
+        mode: 'cors',
+        headers: {
+          'Accept': 'image/*,video/*'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const blob = await response.blob();
+      console.log('Blob created:', blob.type, blob.size);
+      
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      
+      // Determine file extension
+      let extension = 'jpg';
+      if (mediaItem.mediaType === 'Video') {
+        extension = 'mp4';
+      } else if (blob.type.includes('png')) {
+        extension = 'png';
+      } else if (blob.type.includes('gif')) {
+        extension = 'gif';
+      }
+      
+      link.download = `${mediaItem.title.en || 'media'}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      
+      console.log('Download completed successfully');
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback: open in new tab
+      console.log('Opening in new tab as fallback');
+      window.open(mediaItem.fileUrl, '_blank');
+    }
+  };
+
+  // Handle share
+  const handleShare = async (mediaItem) => {
+    const shareData = {
+      title: mediaItem.title.en,
+      text: mediaItem.description?.en || '',
+      url: window.location.href
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        // Fallback: copy to clipboard
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Link copied to clipboard!');
+      }
+    } catch (error) {
+      console.error('Share failed:', error);
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        alert('Link copied to clipboard!');
+      } catch (clipboardError) {
+        console.error('Clipboard copy failed:', clipboardError);
+      }
+    }
+  };
+
+  // Close modal
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedMedia(null);
+    setImageLoading(false);
+    setImageError(false);
+  };
 
   return (
     <div className="min-h-screen bg-pink-50 p-4">
@@ -175,15 +272,26 @@ export function MediaPage() {
         {activeTab === 'photos' && (
           <div className="flex flex-col lg:flex-row gap-4 justify-between items-start lg:items-center mb-6">
             <div className="flex flex-wrap gap-2">
+              {/* All Media Button */}
+              <Button
+                variant={selectedCategory === 'all' ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedCategory('all')}
+                className={selectedCategory === 'all' ? 'bg-pink-600 text-white' : ''}
+              >
+                {t({ en: 'All Media', mr: 'सर्व मीडिया' })}
+              </Button>
+              
+              {/* Category Buttons */}
               {mediaCategories.map((category) => (
                 <Button
-                  key={category.id}
-                  variant={selectedCategory === category.id ? 'default' : 'outline'}
+                  key={category._id}
+                  variant={selectedCategory === category._id ? 'default' : 'outline'}
                   size="sm"
-                  onClick={() => setSelectedCategory(category.id)}
-                  className={selectedCategory === category.id ? 'bg-pink-600 text-white' : ''}
+                  onClick={() => setSelectedCategory(category._id)}
+                  className={selectedCategory === category._id ? 'bg-pink-600 text-white' : ''}
                 >
-                  {t(category.label)} ({category.count})
+                  {t(category.name)} ({category.mediaCount || 0})
                 </Button>
               ))}
             </div>
@@ -208,29 +316,49 @@ export function MediaPage() {
         )}
 
         {/* Content */}
-        {activeTab === 'photos' ? (
+        {loading ? (
+          <div className="flex justify-center items-center py-12">
+            <div className="text-gray-500">Loading media...</div>
+          </div>
+        ) : activeTab === 'photos' ? (
           <div className={viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}>
-            {filteredPhotos.map((photo) => (
-              <Card key={photo.id} className="overflow-hidden hover:shadow-lg transition-shadow group">
+            {photos.map((photo) => (
+              <Card key={photo._id} className="overflow-hidden hover:shadow-lg transition-shadow group cursor-pointer" onClick={() => handleMediaClick(photo)}>
                 <div className="relative">
                   <ImageWithFallback
-                    src={photo.image}
+                    src={photo.fileUrl || 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=800&h=600&fit=crop'}
                     alt={t(photo.title)}
                     className="w-full h-64 object-cover group-hover:scale-105 transition-transform duration-300"
                   />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300"></div>
                   <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="flex gap-2">
-                      <Button size="sm" variant="secondary" className="h-8 w-8 p-0">
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload(photo);
+                        }}
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="secondary" className="h-8 w-8 p-0">
+                      <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShare(photo);
+                        }}
+                      >
                         <Share2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
                   <Badge className="absolute top-3 left-3 bg-pink-600">
-                    {t(mediaCategories.find(cat => cat.id === photo.category)?.label || { en: '', mr: '' })}
+                    {photo.category?.name?.en || 'Uncategorized'}
                   </Badge>
                 </div>
                 
@@ -242,15 +370,15 @@ export function MediaPage() {
                     <div className="flex items-center gap-4">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {new Date(photo.date).toLocaleDateString()}
+                        {new Date(photo.createdAt).toLocaleDateString()}
                       </span>
                       <span className="flex items-center gap-1">
                         <Eye className="h-3 w-3" />
-                        {photo.views}
+                        {photo.views || 0}
                       </span>
                       <span className="flex items-center gap-1">
                         <Heart className="h-3 w-3" />
-                        {photo.likes}
+                        {photo.likes || 0}
                       </span>
                     </div>
                     <Button size="sm" variant="ghost" className="h-6 w-6 p-0">
@@ -264,10 +392,10 @@ export function MediaPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {videos.map((video) => (
-              <Card key={video.id} className="overflow-hidden hover:shadow-lg transition-shadow group">
+              <Card key={video._id} className="overflow-hidden hover:shadow-lg transition-shadow group cursor-pointer" onClick={() => handleMediaClick(video)}>
                 <div className="relative">
                   <ImageWithFallback
-                    src={video.thumbnail}
+                    src={video.thumbnailUrl || video.fileUrl || 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?w=800&h=600&fit=crop'}
                     alt={t(video.title)}
                     className="w-full h-48 object-cover"
                   />
@@ -276,9 +404,11 @@ export function MediaPage() {
                       <Play className="h-6 w-6 text-white" />
                     </Button>
                   </div>
+                  {video.duration && (
                   <Badge className="absolute bottom-3 right-3 bg-black/70 text-white">
                     {video.duration}
                   </Badge>
+                  )}
                   <Badge className="absolute top-3 left-3 bg-pink-600">
                     {t({ en: 'Video', mr: 'व्हिडिओ' })}
                   </Badge>
@@ -292,18 +422,34 @@ export function MediaPage() {
                     <div className="flex items-center gap-4">
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        {new Date(video.date).toLocaleDateString()}
+                        {new Date(video.createdAt).toLocaleDateString()}
                       </span>
                       <span className="flex items-center gap-1">
                         <Eye className="h-3 w-3" />
-                        {video.views}
+                        {video.views || 0}
                       </span>
                     </div>
                     <div className="flex gap-1">
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDownload(video);
+                        }}
+                      >
                         <Download className="h-4 w-4" />
                       </Button>
-                      <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
+                      <Button 
+                        size="sm" 
+                        variant="ghost" 
+                        className="h-8 w-8 p-0"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleShare(video);
+                        }}
+                      >
                         <Share2 className="h-4 w-4" />
                       </Button>
                     </div>
@@ -314,32 +460,187 @@ export function MediaPage() {
           </div>
         )}
 
-        {/* Upload Section */}
-        <Card className="mt-12 bg-pink-100 border-pink-200">
-          <CardContent className="p-8 text-center">
-            <Camera className="h-12 w-12 text-pink-600 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-pink-800 mb-2">
-              {t({ en: 'Share Your Village Moments', mr: 'आपले गावचे क्षण शेअर करा' })}
-            </h3>
-            <p className="text-pink-700 mb-4">
-              {t({ 
-                en: 'Have photos or videos from village events? Share them with the community!',
-                mr: 'आपल्याकडे गावातील कार्यक्रमांचे फोटो किंवा व्हिडिओ आहेत? ते समुदायासोबत शेअर करा!'
-              })}
-            </p>
-            <div className="flex gap-3 justify-center">
-              <Button className="bg-pink-600 hover:bg-pink-700 text-white">
-                <Camera className="h-4 w-4 mr-2" />
-                {t({ en: 'Upload Photos', mr: 'फोटो अपलोड करा' })}
-              </Button>
-              <Button variant="outline" className="border-pink-300 text-pink-700">
-                <Video className="h-4 w-4 mr-2" />
-                {t({ en: 'Upload Videos', mr: 'व्हिडिओ अपलोड करा' })}
+      </div>
+
+      {/* Media View Modal */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+          <DialogHeader className="p-6 pb-0">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-xl font-bold">
+                {selectedMedia && t(selectedMedia.title)}
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={closeModal}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
               </Button>
             </div>
-          </CardContent>
-        </Card>
+            <p className="text-sm text-gray-600 mt-2">
+              {selectedMedia && t(selectedMedia.description)}
+            </p>
+          </DialogHeader>
+          
+          {selectedMedia && (
+            <div className="flex flex-col lg:flex-row">
+              {/* Media Display */}
+              <div className="flex-1 bg-black flex items-center justify-center min-h-[400px] lg:min-h-[500px] p-4">
+                {imageLoading && !imageError && (
+                  <div className="text-white text-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+                    <p>Loading image...</p>
+                  </div>
+                )}
+                
+                {imageError && (
+                  <div className="text-white text-center">
+                    <p className="text-red-400 mb-4">Failed to load image</p>
+                    <Button 
+                      onClick={() => {
+                        setImageError(false);
+                        setImageLoading(true);
+                        // Force reload by updating the src
+                        const img = document.querySelector('.modal-image');
+                        if (img) {
+                          img.src = selectedMedia.fileUrl + '?t=' + Date.now();
+                        }
+                      }}
+                      variant="outline"
+                      className="text-white border-white hover:bg-white hover:text-black"
+                    >
+                      Retry
+                    </Button>
+                  </div>
+                )}
+                
+                {!imageLoading && !imageError && selectedMedia.mediaType === 'Photo' && (
+                  <div className="relative w-full h-full flex items-center justify-center">
+                    <img
+                      className="modal-image max-w-full max-h-full object-contain"
+                      src={selectedMedia.fileUrl}
+                      alt={t(selectedMedia.title)}
+                      onLoad={() => {
+                        console.log('Image loaded successfully');
+                        setImageLoading(false);
+                        setImageError(false);
+                      }}
+                      onError={(e) => {
+                        console.error('Image load error:', e);
+                        console.log('Failed URL:', selectedMedia.fileUrl);
+                        setImageLoading(false);
+                        setImageError(true);
+                      }}
+                    />
+                  </div>
+                )}
+                
+                {!imageLoading && !imageError && selectedMedia.mediaType === 'Video' && (
+                  <video
+                    src={selectedMedia.fileUrl}
+                    controls
+                    className="max-w-full max-h-full"
+                    autoPlay
+                    onError={(e) => {
+                      console.error('Video load error:', e);
+                      setImageLoading(false);
+                      setImageError(true);
+                    }}
+                    onLoadedData={() => {
+                      setImageLoading(false);
+                      setImageError(false);
+                    }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                )}
+              </div>
+              
+              {/* Media Details */}
+              <div className="w-full lg:w-80 p-6 bg-white border-l">
+                <div className="space-y-4">
+                  {/* Title and Description */}
+                  <div>
+                    <h3 className="font-bold text-lg mb-2">{t(selectedMedia.title)}</h3>
+                    {selectedMedia.description && (
+                      <p className="text-gray-600 text-sm">{t(selectedMedia.description)}</p>
+                    )}
+                  </div>
+                  
+                  {/* Category */}
+                  {selectedMedia.category && (
+                    <div>
+                      <span className="text-sm font-medium text-gray-700">Category:</span>
+                      <Badge className="ml-2 bg-pink-600">
+                        {selectedMedia.category.name?.en || 'Uncategorized'}
+                      </Badge>
+                    </div>
+                  )}
+                  
+                  {/* Tags */}
+                  {selectedMedia.tags && selectedMedia.tags.length > 0 && (
+                    <div>
+                      <span className="text-sm font-medium text-gray-700">Tags:</span>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {selectedMedia.tags.map((tag, index) => (
+                          <Badge key={index} variant="outline" className="text-xs">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  
+                  {/* Stats */}
+                  <div className="flex items-center gap-4 text-sm text-gray-500">
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-4 w-4" />
+                      {new Date(selectedMedia.createdAt).toLocaleDateString()}
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Eye className="h-4 w-4" />
+                      {selectedMedia.views || 0} views
+                    </span>
+                    <span className="flex items-center gap-1">
+                      <Heart className="h-4 w-4" />
+                      {selectedMedia.likes || 0} likes
+                    </span>
+                  </div>
+                  
+                  {/* Actions */}
+                  <div className="flex gap-2 pt-4 border-t">
+                    <Button
+                      onClick={() => handleDownload(selectedMedia)}
+                      className="flex-1"
+                      variant="outline"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download
+                    </Button>
+                    <Button
+                      onClick={() => handleShare(selectedMedia)}
+                      className="flex-1"
+                      variant="outline"
+                    >
+                      <Share2 className="h-4 w-4 mr-2" />
+                      Share
+                    </Button>
+                    <Button
+                      onClick={() => window.open(selectedMedia.fileUrl, '_blank')}
+                      variant="outline"
+                      size="sm"
+                    >
+                      <ExternalLink className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
       </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
