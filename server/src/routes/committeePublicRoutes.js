@@ -22,3 +22,4 @@ router.get('/departments', getPublicDepartments);
 router.get('/office-info', getPublicOfficeInfo);
 
 module.exports = router;
+

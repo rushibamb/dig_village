@@ -16,3 +16,4 @@ router.get('/current', getCurrentWeatherAlert);
 router.get('/alerts', getActiveWeatherAlerts);
 
 module.exports = router;
+

@@ -19,6 +19,8 @@ const grievanceRoutes = require('./routes/grievanceRoutes');
 const newsPublicRoutes = require('./routes/newsPublicRoutes');
 const weatherPublicRoutes = require('./routes/weatherPublicRoutes');
 const committeePublicRoutes = require('./routes/committeePublicRoutes');
+const mediaPublicRoutes = require('./routes/mediaPublicRoutes');
+const mediaUploadRoutes = require('./routes/mediaUploadRoutes');
 
 // Create default admin user
 const createDefaultAdmin = async () => {
@@ -119,6 +121,11 @@ app.use('/api/weather', weatherPublicRoutes);
 // Public committee routes
 app.use('/api/committee', committeePublicRoutes);
 
+// Public media routes
+app.use('/api/media', mediaPublicRoutes);
+
+// Media upload routes
+app.use('/api/upload', mediaUploadRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

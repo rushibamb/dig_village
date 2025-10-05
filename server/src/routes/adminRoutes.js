@@ -70,6 +70,18 @@ const {
   updateOfficeInfo
 } = require('../controllers/committeeAdminController');
 
+// Import Media Admin controllers
+const {
+  createMediaItem,
+  getAllMediaItems,
+  updateMediaItem,
+  deleteMediaItem,
+  createMediaCategory,
+  getAllMediaCategories,
+  updateMediaCategory,
+  deleteMediaCategory
+} = require('../controllers/mediaAdminController');
+
 
 // @route   GET /api/admin/villagers
 // @desc    Admin: Get all villagers with search and filter
@@ -330,6 +342,54 @@ router.get('/office-info', protect, admin, getOfficeInfo);
 // @desc    Admin: Create or update office information
 // @access  Private/Admin
 router.put('/office-info', protect, admin, updateOfficeInfo);
+
+// =============================================
+// MEDIA ITEM MANAGEMENT
+// =============================================
+
+// @route   GET /api/admin/media
+// @desc    Admin: Get all media items with filtering and search
+// @access  Private/Admin
+router.get('/media', protect, admin, getAllMediaItems);
+
+// @route   POST /api/admin/media
+// @desc    Admin: Create new media item
+// @access  Private/Admin
+router.post('/media', protect, admin, createMediaItem);
+
+// @route   PUT /api/admin/media/:id
+// @desc    Admin: Update media item
+// @access  Private/Admin
+router.put('/media/:id', protect, admin, updateMediaItem);
+
+// @route   DELETE /api/admin/media/:id
+// @desc    Admin: Delete media item
+// @access  Private/Admin
+router.delete('/media/:id', protect, admin, deleteMediaItem);
+
+// =============================================
+// MEDIA CATEGORY MANAGEMENT
+// =============================================
+
+// @route   GET /api/admin/media-categories
+// @desc    Admin: Get all media categories
+// @access  Private/Admin
+router.get('/media-categories', protect, admin, getAllMediaCategories);
+
+// @route   POST /api/admin/media-categories
+// @desc    Admin: Create new media category
+// @access  Private/Admin
+router.post('/media-categories', protect, admin, createMediaCategory);
+
+// @route   PUT /api/admin/media-categories/:id
+// @desc    Admin: Update media category
+// @access  Private/Admin
+router.put('/media-categories/:id', protect, admin, updateMediaCategory);
+
+// @route   DELETE /api/admin/media-categories/:id
+// @desc    Admin: Delete media category
+// @access  Private/Admin
+router.delete('/media-categories/:id', protect, admin, deleteMediaCategory);
 
 module.exports = router;
 

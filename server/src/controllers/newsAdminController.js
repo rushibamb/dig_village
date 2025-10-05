@@ -732,3 +732,4 @@ module.exports = {
   // Statistics
   getNewsStats
 };
+

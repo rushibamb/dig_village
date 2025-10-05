@@ -52,3 +52,4 @@ const weatherAlertSchema = new mongoose.Schema({
 });
 
 module.exports = mongoose.model('WeatherAlert', weatherAlertSchema);
+
