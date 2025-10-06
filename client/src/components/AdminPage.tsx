@@ -1,12 +1,35 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, ChangeEvent } from 'react';
 import { adminGetAllMediaItems, adminGetAllMediaCategories, adminCreateMediaItem, adminUpdateMediaItem, adminDeleteMediaItem, adminCreateMediaCategory, adminDeleteMediaCategory } from '../services/mediaService';
+import { 
+  adminGetAllFacilities, 
+  adminCreateFacility, 
+  adminUpdateFacility, 
+  adminDeleteFacility,
+  adminGetAllAchievements, 
+  adminCreateAchievement, 
+  adminUpdateAchievement, 
+  adminDeleteAchievement,
+  Facility,
+  Achievement,
+  SiteSettings
+} from '../services/homeContentService';
+import { getSiteSettings, updateSiteSettings, uploadHomeImage } from '../services/settingsService';
+import {
+  adminGetAllLatestDevelopments,
+  adminCreateLatestDevelopment,
+  adminUpdateLatestDevelopment,
+  adminDeleteLatestDevelopment,
+  adminToggleLatestDevelopmentStatus,
+  adminToggleFeaturedStatus,
+  LatestDevelopment
+} from '../services/latestDevelopmentsService';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Alert, AlertDescription } from './ui/alert';
@@ -73,10 +96,6 @@ import { toast } from 'sonner';
 import { useAuth } from './AuthContext';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { 
-  Plus,
-  Edit,
-  Trash2,
-  Home,
   CreditCard,
   ArrowLeft,
   Upload,
@@ -130,7 +149,11 @@ import {
   Clock as ClockIcon,
   X,
   Check,
-  Save
+  Save,
+  Plus,
+  Edit,
+  Trash2,
+  Home
 } from 'lucide-react';
 
 export function AdminPage() {
@@ -182,6 +205,82 @@ export function AdminPage() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [newMediaCategory, setNewMediaCategory] = useState({
     name: { en: '', mr: '' }
+  });
+
+  // Homepage content management states
+  const [homePageSettings, setHomePageSettings] = useState<SiteSettings>({
+    _id: '',
+    heroTitle: { en: '', mr: '' },
+    heroSubtitle: { en: '', mr: '' },
+    heroImageUrl: '',
+    villageStats: {
+      population: '',
+      households: '',
+      area: '',
+      literacyRate: ''
+    },
+    aboutText: { en: '', mr: '' },
+    aboutImageUrl: '',
+    latestDevelopments: {
+      title: { en: '', mr: '' },
+      subtitle: { en: '', mr: '' }
+    },
+    footer: {
+      copyright: { en: '', mr: '' },
+      description: { en: '', mr: '' },
+      contactInfo: {
+        address: { en: '', mr: '' },
+        phone: '',
+        email: ''
+      },
+      socialLinks: {
+        facebook: '',
+        twitter: '',
+        instagram: '',
+        youtube: ''
+      }
+    },
+    createdAt: '',
+    updatedAt: ''
+  });
+  const [facilities, setFacilities] = useState<Facility[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [isAddFacilityOpen, setIsAddFacilityOpen] = useState(false);
+  const [isEditFacilityOpen, setIsEditFacilityOpen] = useState(false);
+  const [selectedFacility, setSelectedFacility] = useState<Facility | null>(null);
+  
+  // Latest Developments states
+  const [latestDevelopments, setLatestDevelopments] = useState<LatestDevelopment[]>([]);
+  const [isAddLatestDevelopmentOpen, setIsAddLatestDevelopmentOpen] = useState(false);
+  const [isEditLatestDevelopmentOpen, setIsEditLatestDevelopmentOpen] = useState(false);
+  const [selectedLatestDevelopment, setSelectedLatestDevelopment] = useState<LatestDevelopment | null>(null);
+  
+  // Image upload states
+  const [isUploadingHero, setIsUploadingHero] = useState(false);
+  const [isUploadingAbout, setIsUploadingAbout] = useState(false);
+  const [isAddAchievementOpen, setIsAddAchievementOpen] = useState(false);
+  const [isEditAchievementOpen, setIsEditAchievementOpen] = useState(false);
+  const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
+  const [newFacility, setNewFacility] = useState({
+    name: { en: '', mr: '' },
+    description: { en: '', mr: '' },
+    icon: ''
+  });
+  
+  const [newLatestDevelopment, setNewLatestDevelopment] = useState({
+    title: { en: '', mr: '' },
+    description: { en: '', mr: '' },
+    imageUrl: '',
+    category: { en: '', mr: '' },
+    publishDate: new Date().toISOString().split('T')[0],
+    isActive: true,
+    isFeatured: false,
+    priority: 0
+  });
+  const [newAchievement, setNewAchievement] = useState({
+    title: { en: '', mr: '' },
+    description: { en: '', mr: '' },
+    icon: ''
   });
 
   // Worker management states
@@ -472,6 +571,409 @@ export function AdminPage() {
     }
   };
 
+  // ==================== HOMEPAGE CONTENT HANDLERS ====================
+
+  // Handle site settings form changes
+  const handleSettingsChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Handle nested object properties like "heroTitle.en"
+    if (name.includes('.')) {
+      const [parent, child] = name.split('.');
+      setHomePageSettings(prev => ({
+        ...prev,
+        [parent]: {
+          ...prev[parent],
+          [child]: value
+        }
+      }));
+    } else if (name.startsWith('villageStats.')) {
+      // Handle village stats nested object
+      const statKey = name.replace('villageStats.', '');
+      setHomePageSettings(prev => ({
+        ...prev,
+        villageStats: {
+          ...prev.villageStats,
+          [statKey]: value
+        }
+      }));
+    } else {
+      // Handle simple properties
+      setHomePageSettings(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+  };
+
+  // Save site settings handler
+  const handleSaveSiteSettings = async () => {
+    try {
+      await updateSiteSettings(homePageSettings);
+      toast.success('Site settings saved successfully');
+    } catch (error) {
+      console.error('Failed to save site settings:', error);
+      toast.error('Failed to save site settings');
+    }
+  };
+
+  // Handle image upload for hero section
+  const handleHeroImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingHero(true);
+    try {
+      const response = await uploadHomeImage(file);
+      setHomePageSettings(prev => ({
+        ...prev,
+        heroImageUrl: response.data.fileUrl
+      }));
+      toast.success('Hero image uploaded successfully');
+    } catch (error) {
+      console.error('Failed to upload hero image:', error);
+      toast.error('Failed to upload hero image');
+    } finally {
+      setIsUploadingHero(false);
+    }
+  };
+
+  // Handle image upload for about section
+  const handleAboutImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingAbout(true);
+    try {
+      const response = await uploadHomeImage(file);
+      setHomePageSettings(prev => ({
+        ...prev,
+        aboutImageUrl: response.data.fileUrl
+      }));
+      toast.success('About image uploaded successfully');
+    } catch (error) {
+      console.error('Failed to upload about image:', error);
+      toast.error('Failed to upload about image');
+    } finally {
+      setIsUploadingAbout(false);
+    }
+  };
+
+  // ==================== LATEST DEVELOPMENTS HANDLERS ====================
+
+  // Add latest development handler
+  const handleAddLatestDevelopment = async () => {
+    try {
+      if (!newLatestDevelopment.title.en || !newLatestDevelopment.title.mr) {
+        toast.error('Title is required in both languages');
+        return;
+      }
+      if (!newLatestDevelopment.description.en || !newLatestDevelopment.description.mr) {
+        toast.error('Description is required in both languages');
+        return;
+      }
+      if (!newLatestDevelopment.imageUrl) {
+        toast.error('Image URL is required');
+        return;
+      }
+      if (!newLatestDevelopment.category.en || !newLatestDevelopment.category.mr) {
+        toast.error('Category is required in both languages');
+        return;
+      }
+
+      const response = await adminCreateLatestDevelopment(newLatestDevelopment);
+      setLatestDevelopments([response.data, ...latestDevelopments]);
+      setNewLatestDevelopment({
+        title: { en: '', mr: '' },
+        description: { en: '', mr: '' },
+        imageUrl: '',
+        category: { en: '', mr: '' },
+        publishDate: new Date().toISOString().split('T')[0],
+        isActive: true,
+        isFeatured: false,
+        priority: 0
+      });
+      setIsAddLatestDevelopmentOpen(false);
+      toast.success('Latest development added successfully');
+    } catch (error) {
+      console.error('Error adding latest development:', error);
+      toast.error('Failed to add latest development');
+    }
+  };
+
+  // Edit latest development handler
+  const handleEditLatestDevelopment = async () => {
+    try {
+      if (!selectedLatestDevelopment) return;
+      
+      if (!selectedLatestDevelopment.title.en || !selectedLatestDevelopment.title.mr) {
+        toast.error('Title is required in both languages');
+        return;
+      }
+      if (!selectedLatestDevelopment.description.en || !selectedLatestDevelopment.description.mr) {
+        toast.error('Description is required in both languages');
+        return;
+      }
+      if (!selectedLatestDevelopment.imageUrl) {
+        toast.error('Image URL is required');
+        return;
+      }
+      if (!selectedLatestDevelopment.category.en || !selectedLatestDevelopment.category.mr) {
+        toast.error('Category is required in both languages');
+        return;
+      }
+
+      const response = await adminUpdateLatestDevelopment(selectedLatestDevelopment._id, selectedLatestDevelopment);
+      setLatestDevelopments(latestDevelopments.map(ld => 
+        ld._id === selectedLatestDevelopment._id ? response.data : ld
+      ));
+      setSelectedLatestDevelopment(null);
+      setIsEditLatestDevelopmentOpen(false);
+      toast.success('Latest development updated successfully');
+    } catch (error) {
+      console.error('Error updating latest development:', error);
+      toast.error('Failed to update latest development');
+    }
+  };
+
+  // Delete latest development handler
+  const handleDeleteLatestDevelopment = async (id: string) => {
+    if (window.confirm('Are you sure you want to delete this latest development?')) {
+      try {
+        await adminDeleteLatestDevelopment(id);
+        setLatestDevelopments(latestDevelopments.filter(ld => ld._id !== id));
+        toast.success('Latest development deleted successfully');
+      } catch (error) {
+        console.error('Error deleting latest development:', error);
+        toast.error('Failed to delete latest development');
+      }
+    }
+  };
+
+  // Toggle latest development status
+  const handleToggleLatestDevelopmentStatus = async (id: string) => {
+    try {
+      const response = await adminToggleLatestDevelopmentStatus(id);
+      setLatestDevelopments(latestDevelopments.map(ld => 
+        ld._id === id ? response.data : ld
+      ));
+      toast.success(`Latest development ${response.data.isActive ? 'activated' : 'deactivated'} successfully`);
+    } catch (error) {
+      console.error('Error toggling latest development status:', error);
+      toast.error('Failed to toggle latest development status');
+    }
+  };
+
+  // Toggle featured status
+  const handleToggleFeaturedStatus = async (id: string) => {
+    try {
+      const response = await adminToggleFeaturedStatus(id);
+      setLatestDevelopments(latestDevelopments.map(ld => 
+        ld._id === id ? response.data : ld
+      ));
+      toast.success(`Latest development ${response.data.isFeatured ? 'featured' : 'unfeatured'} successfully`);
+    } catch (error) {
+      console.error('Error toggling featured status:', error);
+      toast.error('Failed to toggle featured status');
+    }
+  };
+
+  // ==================== FACILITY HANDLERS ====================
+
+  // Add facility handler
+  const handleAddFacility = async () => {
+    try {
+      if (!newFacility.name.en || !newFacility.name.mr) {
+        toast.error('Please fill in both English and Marathi names');
+        return;
+      }
+
+      await adminCreateFacility(newFacility);
+      
+      // Reset form
+      setNewFacility({
+        name: { en: '', mr: '' },
+        description: { en: '', mr: '' },
+        icon: ''
+      });
+      
+      // Close modal
+      setIsAddFacilityOpen(false);
+      
+      // Refresh facilities list
+      await fetchFacilities();
+      
+      toast.success('Facility added successfully');
+    } catch (error) {
+      console.error('Failed to add facility:', error);
+      toast.error('Failed to add facility');
+    }
+  };
+
+  // Update facility handler
+  const handleUpdateFacility = async () => {
+    try {
+      if (!selectedFacility) return;
+      
+      if (!newFacility.name.en || !newFacility.name.mr) {
+        toast.error('Please fill in both English and Marathi names');
+        return;
+      }
+
+      await adminUpdateFacility(selectedFacility._id, newFacility);
+      
+      // Reset form and close modal
+      setNewFacility({
+        name: { en: '', mr: '' },
+        description: { en: '', mr: '' },
+        icon: ''
+      });
+      setSelectedFacility(null);
+      setIsEditFacilityOpen(false);
+      
+      // Refresh facilities list
+      await fetchFacilities();
+      
+      toast.success('Facility updated successfully');
+    } catch (error) {
+      console.error('Failed to update facility:', error);
+      toast.error('Failed to update facility');
+    }
+  };
+
+  // Delete facility handler
+  const handleDeleteFacility = async (facilityId) => {
+    if (window.confirm('Are you sure you want to delete this facility?')) {
+      try {
+        await adminDeleteFacility(facilityId);
+        await fetchFacilities();
+        toast.success('Facility deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete facility:', error);
+        toast.error('Failed to delete facility');
+      }
+    }
+  };
+
+  // ==================== ACHIEVEMENT HANDLERS ====================
+
+  // Add achievement handler
+  const handleAddAchievement = async () => {
+    try {
+      if (!newAchievement.title.en || !newAchievement.title.mr) {
+        toast.error('Please fill in both English and Marathi titles');
+        return;
+      }
+
+      await adminCreateAchievement(newAchievement);
+      
+      // Reset form
+      setNewAchievement({
+        title: { en: '', mr: '' },
+        description: { en: '', mr: '' },
+        icon: ''
+      });
+      
+      // Close modal
+      setIsAddAchievementOpen(false);
+      
+      // Refresh achievements list
+      await fetchAchievements();
+      
+      toast.success('Achievement added successfully');
+    } catch (error) {
+      console.error('Failed to add achievement:', error);
+      toast.error('Failed to add achievement');
+    }
+  };
+
+  // Update achievement handler
+  const handleUpdateAchievement = async () => {
+    try {
+      if (!selectedAchievement) return;
+      
+      if (!newAchievement.title.en || !newAchievement.title.mr) {
+        toast.error('Please fill in both English and Marathi titles');
+        return;
+      }
+
+      await adminUpdateAchievement(selectedAchievement._id, newAchievement);
+      
+      // Reset form and close modal
+      setNewAchievement({
+        title: { en: '', mr: '' },
+        description: { en: '', mr: '' },
+        icon: ''
+      });
+      setSelectedAchievement(null);
+      setIsEditAchievementOpen(false);
+      
+      // Refresh achievements list
+      await fetchAchievements();
+      
+      toast.success('Achievement updated successfully');
+    } catch (error) {
+      console.error('Failed to update achievement:', error);
+      toast.error('Failed to update achievement');
+    }
+  };
+
+  // Delete achievement handler
+  const handleDeleteAchievement = async (achievementId) => {
+    if (window.confirm('Are you sure you want to delete this achievement?')) {
+      try {
+        await adminDeleteAchievement(achievementId);
+        await fetchAchievements();
+        toast.success('Achievement deleted successfully');
+      } catch (error) {
+        console.error('Failed to delete achievement:', error);
+        toast.error('Failed to delete achievement');
+      }
+    }
+  };
+
+  // Fetch facilities
+  const fetchFacilities = async () => {
+    try {
+      const response = await adminGetAllFacilities();
+      setFacilities(response.data);
+    } catch (error) {
+      console.error('Failed to fetch facilities:', error);
+    }
+  };
+
+  // Fetch latest developments
+  const fetchLatestDevelopments = async () => {
+    try {
+      const response = await adminGetAllLatestDevelopments();
+      setLatestDevelopments(response.data);
+    } catch (error) {
+      console.error('Failed to fetch latest developments:', error);
+    }
+  };
+
+  // Fetch achievements
+  const fetchAchievements = async () => {
+    try {
+      const response = await adminGetAllAchievements();
+      setAchievements(response.data);
+    } catch (error) {
+      console.error('Failed to fetch achievements:', error);
+    }
+  };
+
+  // Fetch site settings
+  const fetchSiteSettings = async () => {
+    try {
+      const response = await getSiteSettings();
+      if (response.data) {
+        setHomePageSettings(response.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch site settings:', error);
+    }
+  };
+
   // Reusable function to fetch news data
   const fetchNewsData = async () => {
     try {
@@ -564,7 +1066,11 @@ export function AdminPage() {
         fetchDepartments(),
         fetchOfficeInfo(),
         fetchMediaItems(),
-        fetchMediaCategories()
+        fetchMediaCategories(),
+        fetchSiteSettings(),
+        fetchFacilities(),
+        fetchAchievements(),
+        fetchLatestDevelopments()
       ]);
     };
     fetchInitialData();
@@ -994,33 +1500,6 @@ export function AdminPage() {
     { id: 4, label: { en: 'Literacy Rate', mr: 'साक्षरता दर' }, value: '78%', icon: 'GraduationCap' }
   ]);
 
-  const [facilities, setFacilities] = useState([
-    {
-      id: 1,
-      name: { en: 'Primary School', mr: 'प्राथमिक शाळा' },
-      description: { en: 'Modern educational facility with smart classrooms', mr: 'स्मार्ट वर्गखोल्यांसह आधुनिक शैक्षणिक सुविधा' },
-      icon: 'GraduationCap'
-    },
-    {
-      id: 2,
-      name: { en: 'Health Center', mr: 'आरोग्य केंद्र' },
-      description: { en: '24/7 primary healthcare services', mr: '२४/७ प्राथमिक आरोग्य सेवा' },
-      icon: 'Heart'
-    },
-    {
-      id: 3,
-      name: { en: 'Solar Grid', mr: 'सौर ग्रिड' },
-      description: { en: 'Renewable energy with 80% solar coverage', mr: '८०% सौर कव्हरेजसह नवीकरणीय ऊर्जा' },
-      icon: 'Zap'
-    },
-    {
-      id: 4,
-      name: { en: 'Water System', mr: 'जल प्रणाली' },
-      description: { en: 'Smart water management and purification', mr: 'स्मार्ट जल व्यवस्थापन आणि शुद्धीकरण' },
-      icon: 'Droplets'
-    }
-  ]);
-
   const [developments, setDevelopments] = useState([
     {
       id: 1,
@@ -1035,21 +1514,6 @@ export function AdminPage() {
       date: '12 Jan 2024',
       category: { en: 'Health', mr: 'आरोग्य' },
       image: 'https://images.unsplash.com/photo-1740477138822-906f6b845579'
-    }
-  ]);
-
-  const [achievements, setAchievements] = useState([
-    {
-      id: 1,
-      title: { en: 'Best Digital Village 2023', mr: 'सर्वोत्तम डिजिटल गाव २०२३' },
-      description: { en: 'State Government Recognition', mr: 'राज्य सरकार मान्यता' },
-      icon: '🏆'
-    },
-    {
-      id: 2,
-      title: { en: 'Clean Village Award', mr: 'स्वच्छ गाव पुरस्कार' },
-      description: { en: 'District Level Achievement', mr: 'जिल्हा स्तरीय उपलब्धी' },
-      icon: '🌟'
     }
   ]);
 
@@ -3063,15 +3527,727 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
           </TabsContent>
 
           {/* Other Tab Contents */}
-          <TabsContent value="home">
-            <div className="text-center py-12">
-              <h3 className="text-xl font-semibold text-gray-700 mb-4">
-                {t({ en: 'Home Content Management', mr: 'होम सामग्री व्यवस्थापन' })}
-              </h3>
-              <p className="text-gray-600">
-                {t({ en: 'Manage website homepage content', mr: 'वेबसाइट होमपेज सामग्री व्यवस्थापित करा' })}
-              </p>
+          {/* Home Content Management Tab */}
+          <TabsContent value="home" className="space-y-6">
+            <div className="space-y-6">
+              {/* Header */}
+              <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">{t({ en: 'Home Content Management', mr: 'होम सामग्री व्यवस्थापन' })}</h2>
+                  <p className="text-gray-600 mt-1">{t({ en: 'Manage website homepage content, facilities, and achievements', mr: 'वेबसाइट होमपेज सामग्री, सुविधा आणि यशस्वीता व्यवस्थापित करा' })}</p>
+                </div>
               </div>
+
+              {/* Site Settings Card */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>{t({ en: 'Site Settings', mr: 'साइट सेटिंग्ज' })}</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                  {/* Hero Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">{t({ en: 'Hero Section', mr: 'हिरो विभाग' })}</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Hero Title (English)', mr: 'हिरो शीर्षक (इंग्रजी)' })}</Label>
+                        <Input
+                          name="heroTitle.en"
+                          value={homePageSettings.heroTitle?.en || ''}
+                          onChange={handleSettingsChange}
+                          placeholder="Welcome to Our Village"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Hero Title (Marathi)', mr: 'हिरो शीर्षक (मराठी)' })}</Label>
+                        <Input
+                          name="heroTitle.mr"
+                          value={homePageSettings.heroTitle?.mr || ''}
+                          onChange={handleSettingsChange}
+                          placeholder="आमच्या गावात आपले स्वागत आहे"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Hero Subtitle (English)', mr: 'हिरो उपशीर्षक (इंग्रजी)' })}</Label>
+                        <Input
+                          name="heroSubtitle.en"
+                          value={homePageSettings.heroSubtitle?.en || ''}
+                          onChange={handleSettingsChange}
+                          placeholder="A digital gateway to our community"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Hero Subtitle (Marathi)', mr: 'हिरो उपशीर्षक (मराठी)' })}</Label>
+                        <Input
+                          name="heroSubtitle.mr"
+                          value={homePageSettings.heroSubtitle?.mr || ''}
+                          onChange={handleSettingsChange}
+                          placeholder="आमच्या समुदायाचा डिजिटल दरवाजा"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>{t({ en: 'Hero Image', mr: 'हिरो प्रतिमा' })}</Label>
+                      <div className="flex gap-2">
+                      <Input
+                        name="heroImageUrl"
+                        value={homePageSettings.heroImageUrl || ''}
+                        onChange={handleSettingsChange}
+                        placeholder="https://example.com/hero-image.jpg"
+                          className="flex-1"
+                        />
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleHeroImageUpload}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            disabled={isUploadingHero}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isUploadingHero}
+                            className="whitespace-nowrap"
+                          >
+                            {isUploadingHero ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                                {t({ en: 'Uploading...', mr: 'अपलोड होत आहे...' })}
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-2" />
+                                {t({ en: 'Upload', mr: 'अपलोड' })}
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      {homePageSettings.heroImageUrl && (
+                        <div className="mt-2">
+                          <img
+                            src={homePageSettings.heroImageUrl}
+                            alt="Hero preview"
+                            className="w-full h-32 object-cover rounded-md border"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Village Statistics */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">{t({ en: 'Village Statistics', mr: 'गाव आकडेवारी' })}</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Population', mr: 'लोकसंख्या' })}</Label>
+                        <Input
+                          name="villageStats.population"
+                          value={homePageSettings.villageStats?.population || ''}
+                          onChange={handleSettingsChange}
+                          placeholder="2,500"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Households', mr: 'कुटुंबे' })}</Label>
+                        <Input
+                          name="villageStats.households"
+                          value={homePageSettings.villageStats?.households || ''}
+                          onChange={handleSettingsChange}
+                          placeholder="450"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Area', mr: 'क्षेत्रफळ' })}</Label>
+                        <Input
+                          name="villageStats.area"
+                          value={homePageSettings.villageStats?.area || ''}
+                          onChange={handleSettingsChange}
+                          placeholder="15.2 sq km"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Literacy Rate', mr: 'साक्षरता दर' })}</Label>
+                        <Input
+                          name="villageStats.literacyRate"
+                          value={homePageSettings.villageStats?.literacyRate || ''}
+                          onChange={handleSettingsChange}
+                          placeholder="95%"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* About Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">{t({ en: 'About Section', mr: 'आमच्याबद्दल विभाग' })}</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'About Text (English)', mr: 'आमच्याबद्दल मजकूर (इंग्रजी)' })}</Label>
+                        <Textarea
+                          value={homePageSettings.aboutText?.en || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            aboutText: { ...prev.aboutText, en: e.target.value }
+                          }))}
+                          placeholder="Our village is a vibrant community..."
+                          rows={4}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'About Text (Marathi)', mr: 'आमच्याबद्दल मजकूर (मराठी)' })}</Label>
+                        <Textarea
+                          value={homePageSettings.aboutText?.mr || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            aboutText: { ...prev.aboutText, mr: e.target.value }
+                          }))}
+                          placeholder="आमचे गाव एक जीवंत समुदाय आहे..."
+                          rows={4}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label>{t({ en: 'About Image', mr: 'आमच्याबद्दल प्रतिमा' })}</Label>
+                      <div className="flex gap-2">
+                      <Input
+                        value={homePageSettings.aboutImageUrl || ''}
+                        onChange={(e) => setHomePageSettings(prev => ({
+                          ...prev,
+                          aboutImageUrl: e.target.value
+                        }))}
+                        placeholder="https://example.com/about-image.jpg"
+                          className="flex-1"
+                        />
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            onChange={handleAboutImageUpload}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            disabled={isUploadingAbout}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isUploadingAbout}
+                            className="whitespace-nowrap"
+                          >
+                            {isUploadingAbout ? (
+                              <>
+                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                                {t({ en: 'Uploading...', mr: 'अपलोड होत आहे...' })}
+                              </>
+                            ) : (
+                              <>
+                                <Upload className="h-4 w-4 mr-2" />
+                                {t({ en: 'Upload', mr: 'अपलोड' })}
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      {homePageSettings.aboutImageUrl && (
+                        <div className="mt-2">
+                          <img
+                            src={homePageSettings.aboutImageUrl}
+                            alt="About preview"
+                            className="w-full h-32 object-cover rounded-md border"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Latest Developments Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">{t({ en: 'Latest Developments Section', mr: 'अलीकडील विकास विभाग' })}</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })}</Label>
+                        <Input
+                          value={homePageSettings.latestDevelopments?.title?.en || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            latestDevelopments: {
+                              ...prev.latestDevelopments,
+                              title: { ...prev.latestDevelopments?.title, en: e.target.value }
+                            }
+                          }))}
+                          placeholder="Latest Developments"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</Label>
+                        <Input
+                          value={homePageSettings.latestDevelopments?.title?.mr || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            latestDevelopments: {
+                              ...prev.latestDevelopments,
+                              title: { ...prev.latestDevelopments?.title, mr: e.target.value }
+                            }
+                          }))}
+                          placeholder="अलीकडील विकास"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Subtitle (English)', mr: 'उपशीर्षक (इंग्रजी)' })}</Label>
+                        <Input
+                          value={homePageSettings.latestDevelopments?.subtitle?.en || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            latestDevelopments: {
+                              ...prev.latestDevelopments,
+                              subtitle: { ...prev.latestDevelopments?.subtitle, en: e.target.value }
+                            }
+                          }))}
+                          placeholder="Stay updated with our village progress"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Subtitle (Marathi)', mr: 'उपशीर्षक (मराठी)' })}</Label>
+                        <Input
+                          value={homePageSettings.latestDevelopments?.subtitle?.mr || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            latestDevelopments: {
+                              ...prev.latestDevelopments,
+                              subtitle: { ...prev.latestDevelopments?.subtitle, mr: e.target.value }
+                            }
+                          }))}
+                          placeholder="आमच्या गावाच्या प्रगतीसह अद्ययावत राहा"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Footer Section */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">{t({ en: 'Footer Section', mr: 'फूटर विभाग' })}</h3>
+                    
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Copyright (English)', mr: 'कॉपीराइट (इंग्रजी)' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.copyright?.en || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              copyright: { ...prev.footer?.copyright, en: e.target.value }
+                            }
+                          }))}
+                          placeholder="© 2024 Rampur Village. All rights reserved."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Copyright (Marathi)', mr: 'कॉपीराइट (मराठी)' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.copyright?.mr || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              copyright: { ...prev.footer?.copyright, mr: e.target.value }
+                            }
+                          }))}
+                          placeholder="© २०२४ रामपूर गाव. सर्व हक्क राखीव."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                        <Textarea
+                          value={homePageSettings.footer?.description?.en || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              description: { ...prev.footer?.description, en: e.target.value }
+                            }
+                          }))}
+                          placeholder="A progressive smart village embracing technology..."
+                          rows={3}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                        <Textarea
+                          value={homePageSettings.footer?.description?.mr || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              description: { ...prev.footer?.description, mr: e.target.value }
+                            }
+                          }))}
+                          placeholder="शाश्वत जीवन आणि डिजिटल गव्हर्नन्ससाठी तंत्रज्ञानाचा अवलंब करणारे प्रगतिशील स्मार्ट गाव..."
+                          rows={3}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Address (English)', mr: 'पत्ता (इंग्रजी)' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.contactInfo?.address?.en || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              contactInfo: {
+                                ...prev.footer?.contactInfo,
+                                address: { ...prev.footer?.contactInfo?.address, en: e.target.value }
+                              }
+                            }
+                          }))}
+                          placeholder="Main Road, Rampur, Dist. Pune - 412345"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Address (Marathi)', mr: 'पत्ता (मराठी)' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.contactInfo?.address?.mr || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              contactInfo: {
+                                ...prev.footer?.contactInfo,
+                                address: { ...prev.footer?.contactInfo?.address, mr: e.target.value }
+                              }
+                            }
+                          }))}
+                          placeholder="मुख्य रस्ता, रामपूर, जिल्हा पुणे - ४१२३४५"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Phone', mr: 'फोन' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.contactInfo?.phone || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              contactInfo: {
+                                ...prev.footer?.contactInfo,
+                                phone: e.target.value
+                              }
+                            }
+                          }))}
+                          placeholder="+91 20 1234 5678"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Email', mr: 'ईमेल' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.contactInfo?.email || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              contactInfo: {
+                                ...prev.footer?.contactInfo,
+                                email: e.target.value
+                              }
+                            }
+                          }))}
+                          placeholder="rampur.panchayat@gov.in"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Facebook', mr: 'फेसबुक' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.socialLinks?.facebook || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              socialLinks: {
+                                ...prev.footer?.socialLinks,
+                                facebook: e.target.value
+                              }
+                            }
+                          }))}
+                          placeholder="https://facebook.com/..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Twitter', mr: 'ट्विटर' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.socialLinks?.twitter || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              socialLinks: {
+                                ...prev.footer?.socialLinks,
+                                twitter: e.target.value
+                              }
+                            }
+                          }))}
+                          placeholder="https://twitter.com/..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'Instagram', mr: 'इन्स्टाग्राम' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.socialLinks?.instagram || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              socialLinks: {
+                                ...prev.footer?.socialLinks,
+                                instagram: e.target.value
+                              }
+                            }
+                          }))}
+                          placeholder="https://instagram.com/..."
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>{t({ en: 'YouTube', mr: 'यूट्यूब' })}</Label>
+                        <Input
+                          value={homePageSettings.footer?.socialLinks?.youtube || ''}
+                          onChange={(e) => setHomePageSettings(prev => ({
+                            ...prev,
+                            footer: {
+                              ...prev.footer,
+                              socialLinks: {
+                                ...prev.footer?.socialLinks,
+                                youtube: e.target.value
+                              }
+                            }
+                          }))}
+                          placeholder="https://youtube.com/..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end">
+                    <Button onClick={handleSaveSiteSettings} className="bg-indigo-600 hover:bg-indigo-700">
+                      {t({ en: 'Save Settings', mr: 'सेटिंग्ज सेव्ह करा' })}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Manage Latest Developments Card */}
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>{t({ en: 'Manage Latest Developments', mr: 'अलीकडील विकास व्यवस्थापित करा' })}</CardTitle>
+                    <Button onClick={() => setIsAddLatestDevelopmentOpen(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t({ en: 'Add Latest Development', mr: 'अलीकडील विकास जोडा' })}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {latestDevelopments.length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">{t({ en: 'No latest developments added yet', mr: 'अद्याप कोणताही अलीकडील विकास जोडला नाही' })}</p>
+                    ) : (
+                      <div className="grid gap-4">
+                        {latestDevelopments.map((development) => (
+                          <div key={development._id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h4 className="font-semibold text-lg">{development.title.en}</h4>
+                                  <Badge variant={development.isActive ? "default" : "secondary"}>
+                                    {development.isActive ? t({ en: 'Active', mr: 'सक्रिय' }) : t({ en: 'Inactive', mr: 'निष्क्रिय' })}
+                                  </Badge>
+                                  {development.isFeatured && (
+                                    <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                                      {t({ en: 'Featured', mr: 'विशेष' })}
+                                    </Badge>
+                                  )}
+                                </div>
+                                <p className="text-sm text-gray-600 mb-2">{development.description.en}</p>
+                                <div className="flex items-center gap-4 text-xs text-gray-500">
+                                  <span>{t({ en: 'Category', mr: 'श्रेणी' })}: {development.category.en}</span>
+                                  <span>{t({ en: 'Priority', mr: 'प्राधान्य' })}: {development.priority}</span>
+                                  <span>{new Date(development.publishDate).toLocaleDateString()}</span>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleLatestDevelopmentStatus(development._id)}
+                                  className={development.isActive ? "text-red-600 hover:text-red-700" : "text-green-600 hover:text-green-700"}
+                                >
+                                  {development.isActive ? <XCircle className="h-4 w-4" /> : <CheckCircle className="h-4 w-4" />}
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleFeaturedStatus(development._id)}
+                                  className={development.isFeatured ? "text-yellow-600 hover:text-yellow-700" : "text-gray-600 hover:text-gray-700"}
+                                >
+                                  <Star className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedLatestDevelopment(development);
+                                    setIsEditLatestDevelopmentOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleDeleteLatestDevelopment(development._id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Manage Facilities Card */}
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>{t({ en: 'Manage Facilities', mr: 'सुविधा व्यवस्थापित करा' })}</CardTitle>
+                    <Button onClick={() => setIsAddFacilityOpen(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t({ en: 'Add Facility', mr: 'सुविधा जोडा' })}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {facilities.length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">{t({ en: 'No facilities added yet', mr: 'अद्याप कोणतीही सुविधा जोडली नाही' })}</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {facilities.map((facility) => (
+                          <div key={facility._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">{facility.icon}</span>
+                                <h4 className="font-semibold">{facility.name.en}</h4>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedFacility(facility);
+                                    setIsEditFacilityOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleDeleteFacility(facility._id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600">{facility.description?.en}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Manage Achievements Card */}
+              <Card>
+                <CardHeader>
+                  <div className="flex justify-between items-center">
+                    <CardTitle>{t({ en: 'Manage Achievements', mr: 'यशस्वीता व्यवस्थापित करा' })}</CardTitle>
+                    <Button onClick={() => setIsAddAchievementOpen(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t({ en: 'Add Achievement', mr: 'यशस्वीता जोडा' })}
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {achievements.length === 0 ? (
+                      <p className="text-gray-500 text-center py-8">{t({ en: 'No achievements added yet', mr: 'अद्याप कोणतीही यशस्वीता जोडली नाही' })}</p>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                        {achievements.map((achievement) => (
+                          <div key={achievement._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-2xl">{achievement.icon}</span>
+                                <h4 className="font-semibold">{achievement.title.en}</h4>
+                              </div>
+                              <div className="flex gap-1">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedAchievement(achievement);
+                                    setIsEditAchievementOpen(true);
+                                  }}
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="text-red-600 hover:text-red-700"
+                                  onClick={() => handleDeleteAchievement(achievement._id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                            <p className="text-sm text-gray-600">{achievement.description?.en}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           <TabsContent value="tax">
@@ -7559,6 +8735,332 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 </Button>
               </div>
             </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Latest Development Dialog */}
+        <Dialog open={isAddLatestDevelopmentOpen} onOpenChange={setIsAddLatestDevelopmentOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{t({ en: 'Add Latest Development', mr: 'अलीकडील विकास जोडा' })}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })}</Label>
+                  <Input
+                    value={newLatestDevelopment.title.en}
+                    onChange={(e) => setNewLatestDevelopment({
+                      ...newLatestDevelopment,
+                      title: { ...newLatestDevelopment.title, en: e.target.value }
+                    })}
+                    placeholder="Latest Development Title"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</Label>
+                  <Input
+                    value={newLatestDevelopment.title.mr}
+                    onChange={(e) => setNewLatestDevelopment({
+                      ...newLatestDevelopment,
+                      title: { ...newLatestDevelopment.title, mr: e.target.value }
+                    })}
+                    placeholder="अलीकडील विकास शीर्षक"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                  <Textarea
+                    value={newLatestDevelopment.description.en}
+                    onChange={(e) => setNewLatestDevelopment({
+                      ...newLatestDevelopment,
+                      description: { ...newLatestDevelopment.description, en: e.target.value }
+                    })}
+                    placeholder="Development description..."
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                  <Textarea
+                    value={newLatestDevelopment.description.mr}
+                    onChange={(e) => setNewLatestDevelopment({
+                      ...newLatestDevelopment,
+                      description: { ...newLatestDevelopment.description, mr: e.target.value }
+                    })}
+                    placeholder="विकास वर्णन..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>{t({ en: 'Image URL', mr: 'प्रतिमा URL' })}</Label>
+                <Input
+                  value={newLatestDevelopment.imageUrl}
+                  onChange={(e) => setNewLatestDevelopment({
+                    ...newLatestDevelopment,
+                    imageUrl: e.target.value
+                  })}
+                  placeholder="https://example.com/image.jpg"
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Category (English)', mr: 'श्रेणी (इंग्रजी)' })}</Label>
+                  <Input
+                    value={newLatestDevelopment.category.en}
+                    onChange={(e) => setNewLatestDevelopment({
+                      ...newLatestDevelopment,
+                      category: { ...newLatestDevelopment.category, en: e.target.value }
+                    })}
+                    placeholder="Category"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Category (Marathi)', mr: 'श्रेणी (मराठी)' })}</Label>
+                  <Input
+                    value={newLatestDevelopment.category.mr}
+                    onChange={(e) => setNewLatestDevelopment({
+                      ...newLatestDevelopment,
+                      category: { ...newLatestDevelopment.category, mr: e.target.value }
+                    })}
+                    placeholder="श्रेणी"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Publish Date', mr: 'प्रकाशन तारीख' })}</Label>
+                  <Input
+                    type="date"
+                    value={newLatestDevelopment.publishDate}
+                    onChange={(e) => setNewLatestDevelopment({
+                      ...newLatestDevelopment,
+                      publishDate: e.target.value
+                    })}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Priority', mr: 'प्राधान्य' })}</Label>
+                  <Input
+                    type="number"
+                    value={newLatestDevelopment.priority}
+                    onChange={(e) => setNewLatestDevelopment({
+                      ...newLatestDevelopment,
+                      priority: parseInt(e.target.value) || 0
+                    })}
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Status', mr: 'स्थिती' })}</Label>
+                  <div className="flex items-center space-x-4">
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={newLatestDevelopment.isActive}
+                        onChange={(e) => setNewLatestDevelopment({
+                          ...newLatestDevelopment,
+                          isActive: e.target.checked
+                        })}
+                        className="mr-2"
+                      />
+                      {t({ en: 'Active', mr: 'सक्रिय' })}
+                    </label>
+                    <label className="flex items-center">
+                      <input
+                        type="checkbox"
+                        checked={newLatestDevelopment.isFeatured}
+                        onChange={(e) => setNewLatestDevelopment({
+                          ...newLatestDevelopment,
+                          isFeatured: e.target.checked
+                        })}
+                        className="mr-2"
+                      />
+                      {t({ en: 'Featured', mr: 'विशेष' })}
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddLatestDevelopmentOpen(false)}>
+                {t({ en: 'Cancel', mr: 'रद्द करा' })}
+              </Button>
+              <Button onClick={handleAddLatestDevelopment}>
+                {t({ en: 'Add Development', mr: 'विकास जोडा' })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Latest Development Dialog */}
+        <Dialog open={isEditLatestDevelopmentOpen} onOpenChange={setIsEditLatestDevelopmentOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>{t({ en: 'Edit Latest Development', mr: 'अलीकडील विकास संपादित करा' })}</DialogTitle>
+            </DialogHeader>
+            {selectedLatestDevelopment && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })}</Label>
+                    <Input
+                      value={selectedLatestDevelopment.title.en}
+                      onChange={(e) => setSelectedLatestDevelopment({
+                        ...selectedLatestDevelopment,
+                        title: { ...selectedLatestDevelopment.title, en: e.target.value }
+                      })}
+                      placeholder="Latest Development Title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</Label>
+                    <Input
+                      value={selectedLatestDevelopment.title.mr}
+                      onChange={(e) => setSelectedLatestDevelopment({
+                        ...selectedLatestDevelopment,
+                        title: { ...selectedLatestDevelopment.title, mr: e.target.value }
+                      })}
+                      placeholder="अलीकडील विकास शीर्षक"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                    <Textarea
+                      value={selectedLatestDevelopment.description.en}
+                      onChange={(e) => setSelectedLatestDevelopment({
+                        ...selectedLatestDevelopment,
+                        description: { ...selectedLatestDevelopment.description, en: e.target.value }
+                      })}
+                      placeholder="Development description..."
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                    <Textarea
+                      value={selectedLatestDevelopment.description.mr}
+                      onChange={(e) => setSelectedLatestDevelopment({
+                        ...selectedLatestDevelopment,
+                        description: { ...selectedLatestDevelopment.description, mr: e.target.value }
+                      })}
+                      placeholder="विकास वर्णन..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Image URL', mr: 'प्रतिमा URL' })}</Label>
+                  <Input
+                    value={selectedLatestDevelopment.imageUrl}
+                    onChange={(e) => setSelectedLatestDevelopment({
+                      ...selectedLatestDevelopment,
+                      imageUrl: e.target.value
+                    })}
+                    placeholder="https://example.com/image.jpg"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Category (English)', mr: 'श्रेणी (इंग्रजी)' })}</Label>
+                    <Input
+                      value={selectedLatestDevelopment.category.en}
+                      onChange={(e) => setSelectedLatestDevelopment({
+                        ...selectedLatestDevelopment,
+                        category: { ...selectedLatestDevelopment.category, en: e.target.value }
+                      })}
+                      placeholder="Category"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Category (Marathi)', mr: 'श्रेणी (मराठी)' })}</Label>
+                    <Input
+                      value={selectedLatestDevelopment.category.mr}
+                      onChange={(e) => setSelectedLatestDevelopment({
+                        ...selectedLatestDevelopment,
+                        category: { ...selectedLatestDevelopment.category, mr: e.target.value }
+                      })}
+                      placeholder="श्रेणी"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Publish Date', mr: 'प्रकाशन तारीख' })}</Label>
+                    <Input
+                      type="date"
+                      value={selectedLatestDevelopment.publishDate.split('T')[0]}
+                      onChange={(e) => setSelectedLatestDevelopment({
+                        ...selectedLatestDevelopment,
+                        publishDate: e.target.value
+                      })}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Priority', mr: 'प्राधान्य' })}</Label>
+                    <Input
+                      type="number"
+                      value={selectedLatestDevelopment.priority}
+                      onChange={(e) => setSelectedLatestDevelopment({
+                        ...selectedLatestDevelopment,
+                        priority: parseInt(e.target.value) || 0
+                      })}
+                      placeholder="0"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Status', mr: 'स्थिती' })}</Label>
+                    <div className="flex items-center space-x-4">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedLatestDevelopment.isActive}
+                          onChange={(e) => setSelectedLatestDevelopment({
+                            ...selectedLatestDevelopment,
+                            isActive: e.target.checked
+                          })}
+                          className="mr-2"
+                        />
+                        {t({ en: 'Active', mr: 'सक्रिय' })}
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={selectedLatestDevelopment.isFeatured}
+                          onChange={(e) => setSelectedLatestDevelopment({
+                            ...selectedLatestDevelopment,
+                            isFeatured: e.target.checked
+                          })}
+                          className="mr-2"
+                        />
+                        {t({ en: 'Featured', mr: 'विशेष' })}
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditLatestDevelopmentOpen(false)}>
+                {t({ en: 'Cancel', mr: 'रद्द करा' })}
+              </Button>
+              <Button onClick={handleEditLatestDevelopment}>
+                {t({ en: 'Update Development', mr: 'विकास अपडेट करा' })}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 

@@ -35,3 +35,5 @@ router.get('/:id', getNewsArticleById);
 
 module.exports = router;
 
+
+

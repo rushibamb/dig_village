@@ -1,8 +1,10 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { useLanguage } from './LanguageProvider';
+import { getPublicFacilities, getPublicAchievements, getPublicSiteSettings, getPublicLatestDevelopments } from '../services/homeContentService';
+import { getPublicOfficeInfo } from '../services/committeeService';
 import { 
   MapPin,
   Users,
@@ -24,111 +26,105 @@ import {
 export function VillageLandingPage() {
   const { t } = useLanguage();
 
-  const villageStats = [
+  // State for all dynamic content
+  const [homeContent, setHomeContent] = useState(null);
+  const [facilities, setFacilities] = useState([]);
+  const [achievements, setAchievements] = useState([]);
+  const [latestDevelopments, setLatestDevelopments] = useState([]);
+  const [contactInfo, setContactInfo] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch all data concurrently
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch all data concurrently for better performance
+        const [siteSettings, facilitiesData, achievementsData, latestDevelopmentsData, officeInfo] = await Promise.all([
+          getPublicSiteSettings(),
+          getPublicFacilities(),
+          getPublicAchievements(),
+          getPublicLatestDevelopments({ limit: 3 }),
+          getPublicOfficeInfo()
+        ]);
+
+        // Update state with fetched data
+        setHomeContent(siteSettings.data || siteSettings);
+        setFacilities(facilitiesData.data || facilitiesData || []);
+        setAchievements(achievementsData.data || achievementsData || []);
+        setLatestDevelopments(latestDevelopmentsData.data || latestDevelopmentsData || []);
+        setContactInfo(officeInfo.data || officeInfo);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        // Set fallback data to prevent empty page
+        setFacilities([]);
+        setAchievements([]);
+        setLatestDevelopments([]);
+        setContactInfo(null);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Static data for village stats icons and labels
+  const villageStatsConfig = [
     {
       icon: Users,
       label: { en: 'Total Population', mr: 'एकूण लोकसंख्या' },
-      value: '3,247',
+      key: 'population',
       gradient: 'from-emerald-500 to-green-600',
       delay: '0.1s'
     },
     {
       icon: Home,
       label: { en: 'Households', mr: 'कुटुंबे' },
-      value: '823',
+      key: 'households',
       gradient: 'from-blue-500 to-cyan-600',
       delay: '0.2s'
     },
     {
       icon: TreePine,
       label: { en: 'Area (Hectares)', mr: 'क्षेत्रफळ (हेक्टर)' },
-      value: '1,250',
+      key: 'area',
       gradient: 'from-purple-500 to-violet-600',
       delay: '0.3s'
     },
     {
       icon: GraduationCap,
       label: { en: 'Literacy Rate', mr: 'साक्षरता दर' },
-      value: '78%',
+      key: 'literacyRate',
       gradient: 'from-orange-500 to-red-600',
       delay: '0.4s'
     }
   ];
 
-  const facilities = [
-    {
-      icon: GraduationCap,
-      name: { en: 'Primary School', mr: 'प्राथमिक शाळा' },
-      description: { en: 'Modern educational facility with smart classrooms', mr: 'स्मार्ट वर्गखोल्यांसह आधुनिक शैक्षणिक सुविधा' },
-      gradient: 'from-blue-500 to-indigo-600',
-      delay: '0.1s'
-    },
-    {
-      icon: Heart,
-      name: { en: 'Health Center', mr: 'आरोग्य केंद्र' },
-      description: { en: '24/7 primary healthcare services', mr: '२४/७ प्राथमिक आरोग्य सेवा' },
-      gradient: 'from-red-500 to-pink-600',
-      delay: '0.2s'
-    },
-    {
-      icon: Zap,
-      name: { en: 'Solar Grid', mr: 'सौर ग्रिड' },
-      description: { en: 'Renewable energy with 80% solar coverage', mr: '८०% सौर कव्हरेजसह नवीकरणीय ऊर्जा' },
-      gradient: 'from-yellow-500 to-orange-600',
-      delay: '0.3s'
-    },
-    {
-      icon: Droplets,
-      name: { en: 'Water System', mr: 'जल प्रणाली' },
-      description: { en: 'Smart water management and purification', mr: 'स्मार्ट जल व्यवस्थापन आणि शुद्धीकरण' },
-      gradient: 'from-cyan-500 to-blue-600',
-      delay: '0.4s'
-    }
-  ];
+  // Icon mapping for dynamic facilities
+  const iconMap = {
+    'GraduationCap': GraduationCap,
+    'Heart': Heart,
+    'Zap': Zap,
+    'Droplets': Droplets,
+    'Home': Home,
+    'Users': Users,
+    'TreePine': TreePine,
+    'Phone': Phone,
+    'Calendar': Calendar,
+    'Shield': Shield,
+    'Sparkles': Sparkles
+  };
 
-  const recentUpdates = [
-    {
-      title: { en: 'Digital Infrastructure Upgrade', mr: 'डिजिटल पायाभूत सुविधा सुधारणा' },
-      date: '15 Jan 2024',
-      category: { en: 'Technology', mr: 'तंत्रज्ञान' },
-      gradient: 'from-purple-500 to-indigo-600',
-      image: 'https://images.unsplash.com/photo-1655974239313-5ab1747a002e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwYmVhdXRpZnVsJTIwbGFuZHNjYXBlfGVufDF8fHx8MTc1NTQ1MzI4MXww&ixlib=rb-4.1.0&q=80&w=1080'
-    },
-    {
-      title: { en: 'Community Health Program', mr: 'सामुदायिक आरोग्य कार्यक्रम' },
-      date: '12 Jan 2024',
-      category: { en: 'Health', mr: 'आरोग्य' },
-      gradient: 'from-green-500 to-emerald-600',
-      image: 'https://images.unsplash.com/photo-1740477138822-906f6b845579?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwY29tbXVuaXR5JTIwcGVvcGxlfGVufDF8fHx8MTc1NTQ1MzI4Nnww&ixlib=rb-4.1.0&q=80&w=1080'
-    },
-    {
-      title: { en: 'Smart Farming Initiative', mr: 'स्मार्ट शेती उपक्रम' },
-      date: '8 Jan 2024',
-      category: { en: 'Agriculture', mr: 'शेती' },
-      gradient: 'from-orange-500 to-red-600',
-      image: 'https://images.unsplash.com/photo-1643474004250-05d73e1473e0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwYWdyaWN1bHR1cmUlMjBmYXJtaW5nfGVufDF8fHx8MTc1NTQ1MzI5Mnww&ixlib=rb-4.1.0&q=80&w=1080'
-    }
-  ];
-
-  const achievements = [
-    {
-      title: { en: 'Best Digital Village 2023', mr: 'सर्वोत्तम डिजिटल गाव २०२३' },
-      description: { en: 'State Government Recognition', mr: 'राज्य सरकार मान्यता' },
-      icon: '🏆',
-      gradient: 'from-yellow-500 to-orange-600'
-    },
-    {
-      title: { en: 'Clean Village Award', mr: 'स्वच्छ गाव पुरस्कार' },
-      description: { en: 'District Level Achievement', mr: 'जिल्हा स्तरीय उपलब्धी' },
-      icon: '🌟',
-      gradient: 'from-green-500 to-emerald-600'
-    },
-    {
-      title: { en: 'Solar Champion', mr: 'सौर चॅम्पियन' },
-      description: { en: '80% Renewable Energy', mr: '८०% नवीकरणीय ऊर्जा' },
-      icon: '⚡',
-      gradient: 'from-blue-500 to-cyan-600'
-    }
+  // Default gradients for facilities
+  const gradients = [
+    'from-blue-500 to-indigo-600',
+    'from-red-500 to-pink-600',
+    'from-yellow-500 to-orange-600',
+    'from-cyan-500 to-blue-600',
+    'from-purple-500 to-violet-600',
+    'from-green-500 to-emerald-600'
   ];
 
   return (
@@ -142,7 +138,7 @@ export function VillageLandingPage() {
 
         <div className="h-[600px] relative">
           <ImageWithFallback
-            src="https://images.unsplash.com/photo-1655974239313-5ab1747a002e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwYmVhdXRpZnVsJTIwbGFuZHNjYXBlfGVufDF8fHx8MTc1NTQ1MzI4MXww&ixlib=rb-4.1.0&q=80&w=1080"
+            src={homeContent?.heroImageUrl || "https://images.unsplash.com/photo-1655974239313-5ab1747a002e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwYmVhdXRiZnVsJTIwbGFuZHNjYXBlfGVufDF8fHx8MTc1NTQ1MzI4MXww&ixlib=rb-4.1.0&q=80&w=1080"}
             alt="Village landscape"
             className="w-full h-full object-cover transition-transform duration-1000 hover:scale-105"
           />
@@ -152,16 +148,25 @@ export function VillageLandingPage() {
             <div className="text-center text-white max-w-5xl mx-auto px-6">
               <div className="animate-fade-in-up">
                 <h1 className="text-5xl md:text-7xl font-bold mb-6 gradient-text-primary">
-                  {t({ en: 'Welcome to Rampur Village', mr: 'रामपूर गावात आपले स्वागत आहे' })}
+                  {loading ? 
+                    t({ en: 'Welcome to Rampur Village', mr: 'रामपूर गावात आपले स्वागत आहे' }) :
+                    t(homeContent?.heroTitle) || t({ en: 'Welcome to Rampur Village', mr: 'रामपूर गावात आपले स्वागत आहे' })
+                  }
                 </h1>
               </div>
               
               <div className="animate-slide-in-right" style={{ animationDelay: '0.3s' }}>
                 <p className="text-xl md:text-2xl mb-10 opacity-95 leading-relaxed">
-                  {t({ 
-                    en: 'A progressive smart village embracing technology for sustainable living and digital governance',
-                    mr: 'शाश्वत जीवन आणि डिजिटल गव्हर्नन्ससाठी तंत्रज्ञानाचा अवलंब करणारे प्रगतिशील स्मार्ट गाव'
-                  })}
+                  {loading ?
+                    t({ 
+                      en: 'A progressive smart village embracing technology for sustainable living and digital governance',
+                      mr: 'शाश्वत जीवन आणि डिजिटल गव्हर्नन्ससाठी तंत्रज्ञानाचा अवलंब करणारे प्रगतिशील स्मार्ट गाव'
+                    }) :
+                    t(homeContent?.heroSubtitle) || t({ 
+                      en: 'A progressive smart village embracing technology for sustainable living and digital governance',
+                      mr: 'शाश्वत जीवन आणि डिजिटल गव्हर्नन्ससाठी तंत्रज्ञानाचा अवलंब करणारे प्रगतिशील स्मार्ट गाव'
+                    })
+                  }
                 </p>
               </div>
               
@@ -193,20 +198,23 @@ export function VillageLandingPage() {
           </div>
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {villageStats.map((stat, index) => (
-              <Card key={index} 
-                    className={`text-center border-0 shadow-xl hover-lift glass-effect group animate-scale-in`}
-                    style={{ animationDelay: stat.delay }}>
-                <CardContent className="pt-8 pb-6 relative overflow-hidden">
-                  <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-white/10 to-white/5 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-500"></div>
-                  <div className={`w-20 h-20 bg-gradient-to-br ${stat.gradient} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 animate-float relative z-10`}>
-                    <stat.icon className="h-10 w-10 text-white" />
-                  </div>
-                  <div className="text-4xl font-bold mb-3 gradient-text animate-pulse-slow relative z-10">{stat.value}</div>
-                  <p className="text-gray-600 font-medium relative z-10">{t(stat.label)}</p>
-                </CardContent>
-              </Card>
-            ))}
+            {villageStatsConfig.map((statConfig, index) => {
+              const value = homeContent?.villageStats?.[statConfig.key] || '-';
+              return (
+                <Card key={index} 
+                      className={`text-center border-0 shadow-xl hover-lift glass-effect group animate-scale-in`}
+                      style={{ animationDelay: statConfig.delay }}>
+                  <CardContent className="pt-8 pb-6 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 w-24 h-24 bg-gradient-to-br from-white/10 to-white/5 rounded-full -mr-12 -mt-12 group-hover:scale-110 transition-transform duration-500"></div>
+                    <div className={`w-20 h-20 bg-gradient-to-br ${statConfig.gradient} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-6 transition-all duration-500 animate-float relative z-10`}>
+                      <statConfig.icon className="h-10 w-10 text-white" />
+                    </div>
+                    <div className="text-4xl font-bold mb-3 gradient-text animate-pulse-slow relative z-10">{value}</div>
+                    <p className="text-gray-600 font-medium relative z-10">{t(statConfig.label)}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -220,10 +228,16 @@ export function VillageLandingPage() {
                 {t({ en: 'About Our Smart Village', mr: 'आमच्या स्मार्ट गावाबद्दल' })}
               </h2>
               <p className="text-gray-700 text-lg leading-relaxed mb-8">
-                {t({
-                  en: 'Rampur represents the future of rural India - a harmonious blend of traditional values and cutting-edge technology. Our journey from a small farming community to a digitally empowered smart village showcases what\'s possible when innovation meets determination.',
-                  mr: 'रामपूर ग्रामीण भारताच्या भविष्याचे प्रतिनिधित्व करते - पारंपारिक मूल्ये आणि अत्याधुनिक तंत्रज्ञानाचे सुसंवादी मिश्रण. एका छोट्या शेतकरी समुदायातून डिजिटल सक्षम स्मार्ट गावापर्यंतचा आमचा प्रवास दाखवतो की नवकल्पना आणि दृढनिश्चय भेटल्यावर काय शक्य आहे.'
-                })}
+                {loading ?
+                  t({
+                    en: 'Rampur represents the future of rural India - a harmonious blend of traditional values and cutting-edge technology. Our journey from a small farming community to a digitally empowered smart village showcases what\'s possible when innovation meets determination.',
+                    mr: 'रामपूर ग्रामीण भारताच्या भविष्याचे प्रतिनिधित्व करते - पारंपारिक मूल्ये आणि अत्याधुनिक तंत्रज्ञानाचे सुसंवादी मिश्रण. एका छोट्या शेतकरी समुदायातून डिजिटल सक्षम स्मार्ट गावापर्यंतचा आमचा प्रवास दाखवतो की नवकल्पना आणि दृढनिश्चय भेटल्यावर काय शक्य आहे.'
+                  }) :
+                  t(homeContent?.aboutText) || t({
+                    en: 'Rampur represents the future of rural India - a harmonious blend of traditional values and cutting-edge technology. Our journey from a small farming community to a digitally empowered smart village showcases what\'s possible when innovation meets determination.',
+                    mr: 'रामपूर ग्रामीण भारताच्या भविष्याचे प्रतिनिधित्व करते - पारंपारिक मूल्ये आणि अत्याधुनिक तंत्रज्ञानाचे सुसंवादी मिश्रण. एका छोट्या शेतकरी समुदायातून डिजिटल सक्षम स्मार्ट गावापर्यंतचा आमचा प्रवास दाखवतो की नवकल्पना आणि दृढनिश्चय भेटल्यावर काय शक्य आहे.'
+                  })
+                }
               </p>
               
               <div className="space-y-5">
@@ -245,7 +259,7 @@ export function VillageLandingPage() {
             <div className="relative animate-slide-in-right">
               <div className="glass-effect p-6 rounded-3xl hover-lift shadow-2xl">
                 <ImageWithFallback
-                  src="https://images.unsplash.com/photo-1695981103111-89f89e9755a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHx2aWxsYWdlJTIwdGVtcGxlJTIwYXJjaGl0ZWN0dXJlJTIwaW5kaWF8ZW58MXx8fHwxNzU1NDUzMjg5fDA&ixlib=rb-4.1.0&q=80&w=1080"
+                  src={homeContent?.aboutImageUrl || "https://images.unsplash.com/photo-1695981103111-89f89e9755a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHx2aWxsYWdlJTIwdGVtcGxlJTIwYXJjaGl0ZWN0dXJlJTIwaW5kaWF8ZW58MXx8fHwxNzU1NDUzMjg5fDA&ixlib=rb-4.1.0&q=80&w=1080"}
                   alt="Village temple"
                   className="rounded-2xl w-full h-[450px] object-cover transition-transform duration-700 hover:scale-105"
                 />
@@ -271,20 +285,26 @@ export function VillageLandingPage() {
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {facilities.map((facility, index) => (
-              <Card key={index} 
-                    className={`text-center border-0 shadow-xl hover-lift glass-effect group animate-scale-in hover-tilt`}
-                    style={{ animationDelay: facility.delay }}>
-                <CardContent className="pt-8 pb-6 relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50"></div>
-                  <div className={`w-18 h-18 bg-gradient-to-br ${facility.gradient} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 animate-float relative z-10`}>
-                    <facility.icon className="h-9 w-9 text-white" />
-                  </div>
-                  <h3 className="font-bold text-lg mb-3 relative z-10">{t(facility.name)}</h3>
-                  <p className="text-gray-600 text-sm relative z-10">{t(facility.description)}</p>
-                </CardContent>
-              </Card>
-            ))}
+            {facilities.map((facility, index) => {
+              const IconComponent = iconMap[facility.icon] || Heart;
+              const gradient = gradients[index % gradients.length];
+              const delay = `${0.1 + (index * 0.1)}s`;
+              
+              return (
+                <Card key={facility._id || index} 
+                      className={`text-center border-0 shadow-xl hover-lift glass-effect group animate-scale-in hover-tilt`}
+                      style={{ animationDelay: delay }}>
+                  <CardContent className="pt-8 pb-6 relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50"></div>
+                    <div className={`w-18 h-18 bg-gradient-to-br ${gradient} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 animate-float relative z-10`}>
+                      <IconComponent className="h-9 w-9 text-white" />
+                    </div>
+                    <h3 className="font-bold text-lg mb-3 relative z-10">{t(facility.name) || t({ en: 'Facility', mr: 'सुविधा' })}</h3>
+                    <p className="text-gray-600 text-sm relative z-10">{t(facility.description) || t({ en: 'Description', mr: 'वर्णन' })}</p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -302,32 +322,42 @@ export function VillageLandingPage() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            {recentUpdates.map((update, index) => (
-              <Card key={index} 
-                    className={`overflow-hidden border-0 shadow-xl hover-lift glass-effect group animate-slide-in-left`}
-                    style={{ animationDelay: `${0.1 + index * 0.1}s` }}>
-                <div className="h-52 overflow-hidden relative">
-                  <ImageWithFallback
-                    src={update.image}
-                    alt={t(update.title)}
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                </div>
-                <CardContent className="p-6 relative">
-                  <div className="flex items-center justify-between mb-4">
-                    <Badge className={`bg-gradient-to-r ${update.gradient} text-white border-0 px-3 py-1 shadow-lg`}>
-                      {t(update.category)}
-                    </Badge>
-                    <span className="text-sm text-gray-500 font-medium">{update.date}</span>
+            {latestDevelopments.map((development, index) => {
+              const gradient = gradients[index % gradients.length];
+              const date = new Date(development.publishDate).toLocaleDateString('en-GB', {
+                day: '2-digit',
+                month: 'short',
+                year: 'numeric'
+              });
+              
+              return (
+                <Card key={development._id || index} 
+                      className={`overflow-hidden border-0 shadow-xl hover-lift glass-effect group animate-slide-in-left`}
+                      style={{ animationDelay: `${0.1 + index * 0.1}s` }}>
+                  <div className="h-52 overflow-hidden relative">
+                    <ImageWithFallback
+                      src={development.imageUrl || "https://images.unsplash.com/photo-1655974239313-5ab1747a002e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwYmVhdXRpZnVsJTIwbGFuZHNjYXBlfGVufDF8fHx8MTc1NTQ1MzI4MXww&ixlib=rb-4.1.0&q=80&w=1080"}
+                      alt={t(development.title) || t({ en: 'Latest Development', mr: 'अलीकडील विकास' })}
+                      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
                   </div>
-                  <h3 className="font-bold text-lg mb-3 group-hover:gradient-text transition-all duration-300">{t(update.title)}</h3>
-                  <div className="w-full h-1 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full overflow-hidden">
-                    <div className={`h-full bg-gradient-to-r ${update.gradient} animate-shimmer`}></div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <CardContent className="p-6 relative">
+                    <div className="flex items-center justify-between mb-4">
+                      <Badge className={`bg-gradient-to-r ${gradient} text-white border-0 px-3 py-1 shadow-lg`}>
+                        {t(development.category) || t({ en: 'Development', mr: 'विकास' })}
+                      </Badge>
+                      <span className="text-sm text-gray-500 font-medium">{date}</span>
+                    </div>
+                    <h3 className="font-bold text-lg mb-3 group-hover:gradient-text transition-all duration-300">{t(development.title) || t({ en: 'Latest Development', mr: 'अलीकडील विकास' })}</h3>
+                    <p className="text-gray-600 text-sm mb-3">{t(development.description) || t({ en: 'Development description', mr: 'विकास वर्णन' })}</p>
+                    <div className="w-full h-1 bg-gradient-to-r from-gray-200 to-gray-300 rounded-full overflow-hidden">
+                      <div className={`h-full bg-gradient-to-r ${gradient} animate-shimmer`}></div>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -348,52 +378,54 @@ export function VillageLandingPage() {
           </div>
 
           {/* Featured Achievement */}
-          <div className="mb-16 animate-scale-in">
-            <Card className="border-0 shadow-2xl overflow-hidden glass-effect hover-lift group">
-              <div className="bg-gradient-to-r from-yellow-400/10 via-orange-500/10 to-red-500/10 p-8">
-                <div className="flex flex-col lg:flex-row items-center gap-8">
-                  <div className="w-32 h-32 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-2xl animate-glow group-hover:scale-110 transition-transform duration-500">
-                    <Award className="h-16 w-16 text-white animate-pulse-slow" />
-                  </div>
-                  <div className="flex-1 text-center lg:text-left">
-                    <h3 className="text-3xl font-bold mb-4 gradient-text">
-                      {t({ en: 'Best Digital Village Award 2023', mr: 'सर्वोत्तम डिजिटल गाव पुरस्कार २०२३' })}
-                    </h3>
-                    <p className="text-lg mb-6 text-gray-700 leading-relaxed">
-                      {t({ 
-                        en: 'Awarded by Maharashtra State Government for outstanding digital transformation and e-governance implementation',
-                        mr: 'उत्कृष्ट डिजिटल परिवर्तन आणि ई-गव्हर्नन्स अंमलबजावणीसाठी महाराष्ट्र राज्य सरकारकडून पुरस्कृत'
-                      })}
-                    </p>
-                    <Badge className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white text-base px-6 py-2 shadow-lg">
-                      {t({ en: 'State Level Recognition', mr: 'राज्यस्तरीय मान्यता' })}
-                    </Badge>
+          {achievements.length > 0 && (
+            <div className="mb-16 animate-scale-in">
+              <Card className="border-0 shadow-2xl overflow-hidden glass-effect hover-lift group">
+                <div className="bg-gradient-to-r from-yellow-400/10 via-orange-500/10 to-red-500/10 p-8">
+                  <div className="flex flex-col lg:flex-row items-center gap-8">
+                    <div className="w-32 h-32 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-2xl animate-glow group-hover:scale-110 transition-transform duration-500">
+                      <Award className="h-16 w-16 text-white animate-pulse-slow" />
+                    </div>
+                    <div className="flex-1 text-center lg:text-left">
+                      <h3 className="text-3xl font-bold mb-4 gradient-text">
+                        {t(achievements[0].title) || t({ en: 'Featured Achievement', mr: 'विशेष उपलब्धी' })}
+                      </h3>
+                      <p className="text-lg mb-6 text-gray-700 leading-relaxed">
+                        {t(achievements[0].description) || t({ en: 'Outstanding achievement', mr: 'उत्कृष्ट उपलब्धी' })}
+                      </p>
+                      <Badge className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white text-base px-6 py-2 shadow-lg">
+                        {t({ en: 'State Level Recognition', mr: 'राज्यस्तरीय मान्यता' })}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </Card>
-          </div>
+              </Card>
+            </div>
+          )}
 
           {/* Achievement Grid */}
           <div className="grid md:grid-cols-3 gap-8">
-            {achievements.map((achievement, index) => (
-              <Card key={index} 
-                    className={`text-center border-0 shadow-xl hover-lift glass-effect group animate-scale-in hover-tilt`}
-                    style={{ animationDelay: `${0.2 + index * 0.1}s` }}>
-                <CardContent className="p-8 relative overflow-hidden">
-                  <div className={`absolute inset-0 bg-gradient-to-br ${achievement.gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-500`}></div>
-                  <div className={`w-20 h-20 bg-gradient-to-br ${achievement.gradient} rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 animate-float relative z-10`}>
-                    {achievement.icon}
-                  </div>
-                  <h4 className="font-bold text-lg mb-3 relative z-10 group-hover:gradient-text transition-all duration-300">
-                    {t(achievement.title)}
-                  </h4>
-                  <p className="text-gray-600 relative z-10">
-                    {t(achievement.description)}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
+            {achievements.slice(1).map((achievement, index) => {
+              const gradient = gradients[index % gradients.length];
+              return (
+                <Card key={achievement._id || index} 
+                      className={`text-center border-0 shadow-xl hover-lift glass-effect group animate-scale-in hover-tilt`}
+                      style={{ animationDelay: `${0.2 + index * 0.1}s` }}>
+                  <CardContent className="p-8 relative overflow-hidden">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${gradient} opacity-5 group-hover:opacity-10 transition-opacity duration-500`}></div>
+                    <div className={`w-20 h-20 bg-gradient-to-br ${gradient} rounded-full flex items-center justify-center mx-auto mb-6 text-3xl shadow-xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 animate-float relative z-10`}>
+                      {achievement.icon || '🏆'}
+                    </div>
+                    <h4 className="font-bold text-lg mb-3 relative z-10 group-hover:gradient-text transition-all duration-300">
+                      {t(achievement.title) || t({ en: 'Achievement', mr: 'उपलब्धी' })}
+                    </h4>
+                    <p className="text-gray-600 relative z-10">
+                      {t(achievement.description) || t({ en: 'Description', mr: 'वर्णन' })}
+                    </p>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -415,9 +447,9 @@ export function VillageLandingPage() {
                   {t({ en: 'Village Office', mr: 'गाव कार्यालय' })}
                 </h3>
                 <p className="text-gray-300 leading-relaxed">
-                  Village Panchayat Office<br />
-                  Main Road, Rampur<br />
-                  Dist. Pune - 412345
+                  {contactInfo?.officeName || 'Village Panchayat Office'}<br />
+                  {t(contactInfo?.address) || 'Main Road, Rampur'}<br />
+                  {contactInfo?.pincode || 'Dist. Pune - 412345'}
                 </p>
               </CardContent>
             </Card>
@@ -433,9 +465,9 @@ export function VillageLandingPage() {
                 <div className="text-gray-300 space-y-3">
                   <div className="flex items-center justify-center gap-2">
                     <Phone className="h-4 w-4 text-blue-400" />
-                    <span>+91 20 1234 5678</span>
+                    <span>{contactInfo?.phone || '+91 20 1234 5678'}</span>
                   </div>
-                  <p>rampur.panchayat@gov.in</p>
+                  <p>{contactInfo?.email || 'rampur.panchayat@gov.in'}</p>
                 </div>
               </CardContent>
             </Card>

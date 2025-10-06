@@ -78,3 +78,5 @@ const newsArticleSchema = new mongoose.Schema({
 
 module.exports = mongoose.model('NewsArticle', newsArticleSchema);
 
+
+

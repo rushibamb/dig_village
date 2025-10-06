@@ -82,6 +82,60 @@ const {
   deleteMediaCategory
 } = require('../controllers/mediaAdminController');
 
+// Import Home Content Admin controllers
+const {
+  createFacility,
+  getAllFacilities,
+  getFacilityById,
+  updateFacility,
+  deleteFacility,
+  createAchievement,
+  getAllAchievements,
+  getAchievementById,
+  updateAchievement,
+  deleteAchievement
+} = require('../controllers/homeContentAdminController');
+
+// Import Site Settings Admin controllers
+const {
+  getSiteSettings,
+  updateSiteSettings,
+  uploadHomeImage
+} = require('../controllers/siteSettingsAdminController');
+
+// Import Latest Development Admin controllers
+const {
+  adminGetAllLatestDevelopments,
+  adminCreateLatestDevelopment,
+  adminGetLatestDevelopmentById,
+  adminUpdateLatestDevelopment,
+  adminDeleteLatestDevelopment,
+  adminToggleLatestDevelopmentStatus,
+  adminToggleFeaturedStatus
+} = require('../controllers/latestDevelopmentController');
+
+// Import multer for file uploads
+const multer = require('multer');
+const storage = multer.memoryStorage();
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024, // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    // Check file type
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
+    const extname = allowedTypes.test(file.originalname.toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'));
+    }
+  }
+});
+
 
 // @route   GET /api/admin/villagers
 // @desc    Admin: Get all villagers with search and filter
@@ -390,6 +444,112 @@ router.put('/media-categories/:id', protect, admin, updateMediaCategory);
 // @desc    Admin: Delete media category
 // @access  Private/Admin
 router.delete('/media-categories/:id', protect, admin, deleteMediaCategory);
+
+// ==================== HOME CONTENT ADMIN ROUTES ====================
+
+// @route   POST /api/admin/facilities
+// @desc    Admin: Create new facility
+// @access  Private/Admin
+router.post('/facilities', protect, admin, createFacility);
+
+// @route   GET /api/admin/facilities
+// @desc    Admin: Get all facilities
+// @access  Private/Admin
+router.get('/facilities', protect, admin, getAllFacilities);
+
+// @route   GET /api/admin/facilities/:id
+// @desc    Admin: Get facility by ID
+// @access  Private/Admin
+router.get('/facilities/:id', protect, admin, getFacilityById);
+
+// @route   PUT /api/admin/facilities/:id
+// @desc    Admin: Update facility
+// @access  Private/Admin
+router.put('/facilities/:id', protect, admin, updateFacility);
+
+// @route   DELETE /api/admin/facilities/:id
+// @desc    Admin: Delete facility
+// @access  Private/Admin
+router.delete('/facilities/:id', protect, admin, deleteFacility);
+
+// @route   POST /api/admin/achievements
+// @desc    Admin: Create new achievement
+// @access  Private/Admin
+router.post('/achievements', protect, admin, createAchievement);
+
+// @route   GET /api/admin/achievements
+// @desc    Admin: Get all achievements
+// @access  Private/Admin
+router.get('/achievements', protect, admin, getAllAchievements);
+
+// @route   GET /api/admin/achievements/:id
+// @desc    Admin: Get achievement by ID
+// @access  Private/Admin
+router.get('/achievements/:id', protect, admin, getAchievementById);
+
+// @route   PUT /api/admin/achievements/:id
+// @desc    Admin: Update achievement
+// @access  Private/Admin
+router.put('/achievements/:id', protect, admin, updateAchievement);
+
+// @route   DELETE /api/admin/achievements/:id
+// @desc    Admin: Delete achievement
+// @access  Private/Admin
+router.delete('/achievements/:id', protect, admin, deleteAchievement);
+
+// ==================== SITE SETTINGS ROUTES ====================
+
+// @route   GET /api/admin/site-settings
+// @desc    Admin: Get site settings
+// @access  Private/Admin
+router.get('/site-settings', protect, admin, getSiteSettings);
+
+// @route   PUT /api/admin/site-settings
+// @desc    Admin: Update site settings
+// @access  Private/Admin
+router.put('/site-settings', protect, admin, updateSiteSettings);
+
+// @route   POST /api/admin/site-settings/upload-image
+// @desc    Admin: Upload image for home content
+// @access  Private/Admin
+router.post('/site-settings/upload-image', protect, admin, upload.single('image'), uploadHomeImage);
+
+// ==================== LATEST DEVELOPMENTS ROUTES ====================
+
+// @route   GET /api/admin/latest-developments
+// @desc    Admin: Get all latest developments
+// @access  Private/Admin
+router.get('/latest-developments', protect, admin, adminGetAllLatestDevelopments);
+
+// @route   POST /api/admin/latest-developments
+// @desc    Admin: Create new latest development
+// @access  Private/Admin
+router.post('/latest-developments', protect, admin, adminCreateLatestDevelopment);
+
+// @route   GET /api/admin/latest-developments/:id
+// @desc    Admin: Get latest development by ID
+// @access  Private/Admin
+router.get('/latest-developments/:id', protect, admin, adminGetLatestDevelopmentById);
+
+// @route   PUT /api/admin/latest-developments/:id
+// @desc    Admin: Update latest development
+// @access  Private/Admin
+router.put('/latest-developments/:id', protect, admin, adminUpdateLatestDevelopment);
+
+// @route   DELETE /api/admin/latest-developments/:id
+// @desc    Admin: Delete latest development
+// @access  Private/Admin
+router.delete('/latest-developments/:id', protect, admin, adminDeleteLatestDevelopment);
+
+// @route   PATCH /api/admin/latest-developments/:id/toggle-status
+// @desc    Admin: Toggle latest development status
+// @access  Private/Admin
+router.patch('/latest-developments/:id/toggle-status', protect, admin, adminToggleLatestDevelopmentStatus);
+
+// @route   PATCH /api/admin/latest-developments/:id/toggle-featured
+// @desc    Admin: Toggle featured status
+// @access  Private/Admin
+router.patch('/latest-developments/:id/toggle-featured', protect, admin, adminToggleFeaturedStatus);
 
 module.exports = router;
 

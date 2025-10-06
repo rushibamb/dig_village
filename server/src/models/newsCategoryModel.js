@@ -21,3 +21,5 @@ const newsCategorySchema = new mongoose.Schema({
 
 module.exports = mongoose.model('NewsCategory', newsCategorySchema);
 
+
+

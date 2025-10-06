@@ -75,3 +75,5 @@ const CommitteeMember = mongoose.model('CommitteeMember', committeeMemberSchema)
 
 module.exports = CommitteeMember;
 
+
+

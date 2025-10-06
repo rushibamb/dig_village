@@ -10,7 +10,7 @@ export interface Translation {
 interface LanguageContextType {
   language: Language;
   setLanguage: (lang: Language) => void;
-  t: (translation: Translation) => string;
+  t: (translation: Translation | null | undefined) => string;
 }
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -30,7 +30,12 @@ interface LanguageProviderProps {
 export function LanguageProvider({ children }: LanguageProviderProps) {
   const [language, setLanguage] = useState<Language>('en');
 
-  const t = (translation: Translation) => translation[language];
+  const t = (translation: Translation | null | undefined) => {
+    if (!translation || typeof translation !== 'object') {
+      return '';
+    }
+    return translation[language] || translation.en || '';
+  };
 
   return (
     <LanguageContext.Provider value={{ language, setLanguage, t }}>
