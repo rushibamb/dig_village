@@ -22,6 +22,7 @@ const committeePublicRoutes = require('./routes/committeePublicRoutes');
 const mediaPublicRoutes = require('./routes/mediaPublicRoutes');
 const mediaUploadRoutes = require('./routes/mediaUploadRoutes');
 const homeContentPublicRoutes = require('./routes/homeContentPublicRoutes');
+const projectPublicRoutes = require('./routes/projectPublicRoutes');
 
 // Create default admin user
 const createDefaultAdmin = async () => {
@@ -130,6 +131,9 @@ app.use('/api/upload', mediaUploadRoutes);
 
 // Homepage content routes
 app.use('/api/homepage', homeContentPublicRoutes);
+
+// Public project routes
+app.use('/api/projects', projectPublicRoutes);
 
 // Start server
 const PORT = process.env.PORT || 5000;

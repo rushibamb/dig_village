@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, ChangeEvent } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { adminGetAllMediaItems, adminGetAllMediaCategories, adminCreateMediaItem, adminUpdateMediaItem, adminDeleteMediaItem, adminCreateMediaCategory, adminDeleteMediaCategory } from '../services/mediaService';
 import { 
   adminGetAllFacilities, 
@@ -90,6 +90,7 @@ import {
   adminDeleteDepartment,
   adminUpdateOfficeInfo
 } from '../services/committeeService';
+import { adminGetAllProjects, adminCreateProject, adminUpdateProject, adminDeleteProject } from '../services/contractService';
 
 import { formatDateForAPI } from '../utils/dateUtils';
 import { toast } from 'sonner';
@@ -119,7 +120,6 @@ import {
   Calendar,
   MapPin,
   Settings,
-  Camera,
   Video,
   Image,
   Folder,
@@ -153,7 +153,8 @@ import {
   Plus,
   Edit,
   Trash2,
-  Home
+  Home,
+  Camera
 } from 'lucide-react';
 
 export function AdminPage() {
@@ -174,6 +175,14 @@ export function AdminPage() {
   // Grievance management states
   const [grievances, setGrievances] = useState([]);
   const [workers, setWorkers] = useState([]);
+  const [projects, setProjects] = useState([]);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<any>(null);
+  const [newPhotoUrl, setNewPhotoUrl] = useState('');
+  const [uploadedPhotos, setUploadedPhotos] = useState([]);
+  const [pdfReport, setPdfReport] = useState(null);
+  const [isProjectDetailOpen, setIsProjectDetailOpen] = useState(false);
+  const [viewingProject, setViewingProject] = useState<any>(null);
   const [grievanceLoading, setGrievanceLoading] = useState(true);
 
   // Media management states
@@ -258,6 +267,7 @@ export function AdminPage() {
   // Image upload states
   const [isUploadingHero, setIsUploadingHero] = useState(false);
   const [isUploadingAbout, setIsUploadingAbout] = useState(false);
+  const [isUploadingLatestDev, setIsUploadingLatestDev] = useState(false);
   const [isAddAchievementOpen, setIsAddAchievementOpen] = useState(false);
   const [isEditAchievementOpen, setIsEditAchievementOpen] = useState(false);
   const [selectedAchievement, setSelectedAchievement] = useState<Achievement | null>(null);
@@ -341,6 +351,11 @@ export function AdminPage() {
     fetchVillagers();
   }, [searchTerm, statusFilter]);
 
+  // Fetch projects on component mount
+  useEffect(() => {
+    fetchProjects();
+  }, []);
+
   // Reusable function to fetch grievances
   const fetchGrievances = async () => {
     try {
@@ -352,6 +367,314 @@ export function AdminPage() {
     } finally {
       setGrievanceLoading(false);
     }
+  };
+
+  // Reusable function to fetch projects
+  const fetchProjects = async () => {
+    try {
+      const projectsRes = await adminGetAllProjects();
+      setProjects(projectsRes.data);
+    } catch (error) {
+      console.error("Failed to fetch projects:", error);
+      toast.error("Failed to fetch projects");
+    }
+  };
+
+  // Project CRUD handler functions
+  const handleOpenProjectAddModal = (status) => {
+    const defaultProject: any = {
+      title: { en: '', mr: '' },
+      status: status,
+      department: { en: '', mr: '' },
+      estimatedBudget: 0,
+      issueDate: '',
+      lastDate: '',
+      contactName: { en: '', mr: '' },
+      contactPhone: '',
+      tenderDocuments: [],
+      description: { en: '', mr: '' },
+      tenderNoticeUrl: '',
+      contractor: { en: '', mr: '' },
+      allocatedBudget: 0,
+      startDate: '',
+      expectedCompletionDate: '',
+      progress: 0,
+      currentPhase: { en: '', mr: '' },
+      sitePhotos: [],
+      projectDocuments: [],
+      timeline: [],
+      totalCost: 0,
+      completionDate: '',
+      finalPhotos: [],
+      rating: 0,
+      summary: { en: '', mr: '' },
+      deliverables: [],
+      completionReportUrl: ''
+    };
+    setEditingProject(defaultProject);
+    setNewPhotoUrl('');
+    setUploadedPhotos([]);
+    setIsProjectModalOpen(true);
+  };
+
+  const handleOpenProjectEditModal = (project) => {
+    setEditingProject({ ...project });
+    setNewPhotoUrl('');
+    setUploadedPhotos([]);
+    setIsProjectModalOpen(true);
+  };
+
+  const handleDeleteProject = async (projectId) => {
+    if (window.confirm(t({ en: 'Are you sure you want to delete this project?', mr: 'तुम्हाला खात्री आहे की तुम्ही हा प्रकल्प हटवू इच्छिता?' }))) {
+      try {
+        await adminDeleteProject(projectId);
+        toast.success(t({ en: 'Project deleted successfully', mr: 'प्रकल्प यशस्वीपणे हटवला' }));
+        fetchProjects();
+      } catch (error) {
+        console.error("Failed to delete project:", error);
+        toast.error(t({ en: 'Failed to delete project', mr: 'प्रकल्प हटविण्यात अयशस्वी' }));
+      }
+    }
+  };
+
+  const handleCompleteProject = async (project) => {
+    if (window.confirm(t({ en: 'Are you sure you want to mark this project as completed?', mr: 'तुम्हाला खात्री आहे की तुम्ही हा प्रकल्प पूर्ण केलेला म्हणून चिन्हांकित करू इच्छिता?' }))) {
+      try {
+        // Update project status to Completed and set completion date
+        const updateData = {
+          ...project,
+          status: 'Completed',
+          completionDate: new Date().toISOString().split('T')[0], // Today's date
+          totalCost: project.allocatedBudget || project.estimatedBudget || 0,
+          rating: 5, // Default rating
+          summary: {
+            en: `Project completed successfully on ${new Date().toLocaleDateString()}`,
+            mr: `प्रकल्प ${new Date().toLocaleDateString()} रोजी यशस्वीपणे पूर्ण केला`
+          }
+        };
+
+        await adminUpdateProject(project._id, updateData);
+        toast.success(t({ en: 'Project marked as completed successfully', mr: 'प्रकल्प यशस्वीपणे पूर्ण म्हणून चिन्हांकित केला' }));
+        fetchProjects();
+      } catch (error) {
+        console.error("Failed to complete project:", error);
+        toast.error(t({ en: 'Failed to complete project', mr: 'प्रकल्प पूर्ण करण्यात अयशस्वी' }));
+      }
+    }
+  };
+
+  const handlePdfReportUpload = async (projectId, file) => {
+    try {
+      // Convert PDF to base64 for storage
+      const reader = new FileReader();
+      reader.onload = async (event) => {
+        const base64Pdf = event.target?.result;
+        if (base64Pdf) {
+          // Update project with PDF report URL
+          const project = projects.find(p => p._id === projectId);
+          if (project) {
+            const updateData = {
+              ...project,
+              completionReportUrl: base64Pdf
+            };
+            
+            await adminUpdateProject(projectId, updateData);
+            toast.success(t({ en: 'PDF report uploaded successfully', mr: 'PDF अहवाल यशस्वीपणे अपलोड केला' }));
+            fetchProjects();
+          }
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (error) {
+      console.error("Failed to upload PDF report:", error);
+      toast.error(t({ en: 'Failed to upload PDF report', mr: 'PDF अहवाल अपलोड करण्यात अयशस्वी' }));
+    }
+  };
+
+  const handleViewProjectDetails = (project) => {
+    setViewingProject(project);
+    setIsProjectDetailOpen(true);
+  };
+
+  const handleProjectFormSubmit = async () => {
+    try {
+      // Validate required fields based on project status
+      if (!editingProject.title?.en || !editingProject.title?.mr) {
+        toast.error(t({ en: 'Project title is required in both languages', mr: 'दोन्ही भाषांमध्ये प्रकल्प शीर्षक आवश्यक आहे' }));
+        return;
+      }
+
+      if (!editingProject.department?.en || !editingProject.department?.mr) {
+        toast.error(t({ en: 'Department is required in both languages', mr: 'दोन्ही भाषांमध्ये विभाग आवश्यक आहे' }));
+        return;
+      }
+
+      if (!editingProject.contactName?.en || !editingProject.contactName?.mr) {
+        toast.error(t({ en: 'Contact name is required in both languages', mr: 'दोन्ही भाषांमध्ये संपर्क नाव आवश्यक आहे' }));
+        return;
+      }
+
+      if (!editingProject.contactPhone) {
+        toast.error(t({ en: 'Contact phone is required', mr: 'संपर्क फोन आवश्यक आहे' }));
+        return;
+      }
+
+      if (!editingProject.issueDate || !editingProject.lastDate) {
+        toast.error(t({ en: 'Issue date and last date are required', mr: 'जारी दिनांक आणि अंतिम दिनांक आवश्यक आहेत' }));
+        return;
+      }
+
+      if (!editingProject.estimatedBudget || editingProject.estimatedBudget <= 0) {
+        toast.error(t({ en: 'Estimated budget must be greater than 0', mr: 'अंदाजित अंदाज 0 पेक्षा जास्त असावा' }));
+        return;
+      }
+
+      // Prepare the data for API call with proper validation
+      const projectData = {
+        title: {
+          en: editingProject.title?.en || '',
+          mr: editingProject.title?.mr || ''
+        },
+        status: editingProject.status,
+        department: {
+          en: editingProject.department?.en || '',
+          mr: editingProject.department?.mr || ''
+        },
+        estimatedBudget: Number(editingProject.estimatedBudget),
+        issueDate: editingProject.issueDate,
+        lastDate: editingProject.lastDate,
+        contactName: {
+          en: editingProject.contactName?.en || '',
+          mr: editingProject.contactName?.mr || ''
+        },
+        contactPhone: editingProject.contactPhone || '',
+        tenderDocuments: editingProject.tenderDocuments || [],
+        description: {
+          en: editingProject.description?.en || '',
+          mr: editingProject.description?.mr || ''
+        },
+        tenderNoticeUrl: editingProject.tenderNoticeUrl || ''
+      };
+
+      // Add ongoing-specific fields if status is Ongoing or Completed
+      if (editingProject.status === 'Ongoing' || editingProject.status === 'Completed') {
+        if (!editingProject.contractor?.en || !editingProject.contractor?.mr) {
+          toast.error(t({ en: 'Contractor name is required in both languages for ongoing/completed projects', mr: 'चालू/पूर्ण प्रकल्पांसाठी दोन्ही भाषांमध्ये कंत्राटदार नाव आवश्यक आहे' }));
+          return;
+        }
+        if (!editingProject.startDate) {
+          toast.error(t({ en: 'Start date is required for ongoing/completed projects', mr: 'चालू/पूर्ण प्रकल्पांसाठी सुरुवात दिनांक आवश्यक आहे' }));
+          return;
+        }
+        if (!editingProject.expectedCompletionDate) {
+          toast.error(t({ en: 'Expected completion date is required for ongoing/completed projects', mr: 'चालू/पूर्ण प्रकल्पांसाठी अपेक्षित पूर्णता दिनांक आवश्यक आहे' }));
+          return;
+        }
+        if (!editingProject.currentPhase?.en || !editingProject.currentPhase?.mr) {
+          toast.error(t({ en: 'Current phase is required in both languages for ongoing/completed projects', mr: 'चालू/पूर्ण प्रकल्पांसाठी दोन्ही भाषांमध्ये सध्याचा टप्पा आवश्यक आहे' }));
+          return;
+        }
+        if (!editingProject.allocatedBudget || editingProject.allocatedBudget <= 0) {
+          toast.error(t({ en: 'Allocated budget must be greater than 0 for ongoing/completed projects', mr: 'चालू/पूर्ण प्रकल्पांसाठी वाटप केलेला अंदाज 0 पेक्षा जास्त असावा' }));
+          return;
+        }
+        if (editingProject.progress < 0 || editingProject.progress > 100) {
+          toast.error(t({ en: 'Progress must be between 0 and 100', mr: 'प्रगती 0 ते 100 दरम्यान असावी' }));
+          return;
+        }
+
+        projectData.contractor = {
+          en: editingProject.contractor.en,
+          mr: editingProject.contractor.mr
+        };
+        projectData.allocatedBudget = Number(editingProject.allocatedBudget);
+        projectData.startDate = editingProject.startDate;
+        projectData.expectedCompletionDate = editingProject.expectedCompletionDate;
+        projectData.progress = Number(editingProject.progress);
+        projectData.currentPhase = {
+          en: editingProject.currentPhase.en,
+          mr: editingProject.currentPhase.mr
+        };
+        projectData.sitePhotos = editingProject.sitePhotos || [];
+        projectData.projectDocuments = editingProject.projectDocuments || [];
+        projectData.timeline = editingProject.timeline || [];
+      }
+
+      // Add completed-specific fields if status is Completed
+      if (editingProject.status === 'Completed') {
+        if (!editingProject.totalCost || editingProject.totalCost <= 0) {
+          toast.error(t({ en: 'Total cost is required for completed projects', mr: 'पूर्ण प्रकल्पांसाठी एकूण खर्च आवश्यक आहे' }));
+          return;
+        }
+        if (!editingProject.completionDate) {
+          toast.error(t({ en: 'Completion date is required for completed projects', mr: 'पूर्ण प्रकल्पांसाठी पूर्णता दिनांक आवश्यक आहे' }));
+          return;
+        }
+        if (!editingProject.rating || editingProject.rating < 0 || editingProject.rating > 5) {
+          toast.error(t({ en: 'Rating must be between 0 and 5 for completed projects', mr: 'पूर्ण प्रकल्पांसाठी रेटिंग 0 ते 5 दरम्यान असावे' }));
+          return;
+        }
+        if (!editingProject.summary?.en || !editingProject.summary?.mr) {
+          toast.error(t({ en: 'Summary is required in both languages for completed projects', mr: 'पूर्ण प्रकल्पांसाठी दोन्ही भाषांमध्ये सारांश आवश्यक आहे' }));
+          return;
+        }
+
+        projectData.totalCost = Number(editingProject.totalCost);
+        projectData.completionDate = editingProject.completionDate;
+        projectData.finalPhotos = editingProject.finalPhotos || [];
+        projectData.rating = Number(editingProject.rating);
+        projectData.summary = {
+          en: editingProject.summary.en,
+          mr: editingProject.summary.mr
+        };
+        projectData.deliverables = editingProject.deliverables || [];
+        projectData.completionReportUrl = editingProject.completionReportUrl || '';
+      }
+
+      console.log('Sending project data:', projectData);
+
+      if (editingProject._id) {
+        // Update existing project
+        await adminUpdateProject(editingProject._id, projectData);
+        toast.success(t({ en: 'Project updated successfully', mr: 'प्रकल्प यशस्वीपणे अपडेट केला' }));
+      } else {
+        // Create new project
+        await adminCreateProject(projectData);
+        toast.success(t({ en: 'Project created successfully', mr: 'प्रकल्प यशस्वीपणे तयार केला' }));
+      }
+      setIsProjectModalOpen(false);
+      setEditingProject(null);
+      fetchProjects();
+    } catch (error) {
+      console.error("Failed to save project:", error);
+      console.error("Error details:", error.response?.data || error.message);
+      toast.error(t({ en: 'Failed to save project: ' + (error.response?.data?.message || error.message), mr: 'प्रकल्प सेव्ह करण्यात अयशस्वी: ' + (error.response?.data?.message || error.message) }));
+    }
+  };
+
+  const handleProjectFormChange = (field, value) => {
+    console.log('handleProjectFormChange called with:', field, value);
+    setEditingProject(prev => {
+      console.log('Previous editingProject:', prev);
+      if (field.includes('.')) {
+        const [parent, child] = field.split('.');
+        const newState = {
+          ...prev,
+          [parent]: {
+            ...prev[parent],
+            [child]: value
+          }
+        };
+        console.log('New state (nested):', newState);
+        return newState;
+      }
+      const newState = {
+        ...prev,
+        [field]: value
+      };
+      console.log('New state (direct):', newState);
+      return newState;
+    });
   };
   
   // Reusable function to fetch workers
@@ -659,6 +982,48 @@ export function AdminPage() {
     }
   };
 
+  // Handle image upload for latest developments
+  const handleLatestDevImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLatestDev(true);
+    try {
+      const response = await uploadHomeImage(file);
+      setNewLatestDevelopment(prev => ({
+        ...prev,
+        imageUrl: response.data.fileUrl
+      }));
+      toast.success('Latest development image uploaded successfully');
+    } catch (error) {
+      console.error('Failed to upload latest development image:', error);
+      toast.error('Failed to upload latest development image');
+    } finally {
+      setIsUploadingLatestDev(false);
+    }
+  };
+
+  // Handle image upload for editing latest developments
+  const handleEditLatestDevImageUpload = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsUploadingLatestDev(true);
+    try {
+      const response = await uploadHomeImage(file);
+      setSelectedLatestDevelopment(prev => prev ? ({
+        ...prev,
+        imageUrl: response.data.fileUrl
+      }) : null);
+      toast.success('Latest development image uploaded successfully');
+    } catch (error) {
+      console.error('Failed to upload latest development image:', error);
+      toast.error('Failed to upload latest development image');
+    } finally {
+      setIsUploadingLatestDev(false);
+    }
+  };
+
   // ==================== LATEST DEVELOPMENTS HANDLERS ====================
 
   // Add latest development handler
@@ -855,6 +1220,29 @@ export function AdminPage() {
     }
   };
 
+  // Edit facility handler
+  const handleEditFacility = async () => {
+    try {
+      if (!selectedFacility) return;
+      
+      if (!selectedFacility.name.en || !selectedFacility.name.mr) {
+        toast.error('Facility name is required in both languages');
+        return;
+      }
+
+      const response = await adminUpdateFacility(selectedFacility._id, selectedFacility);
+      setFacilities(facilities.map(f => 
+        f._id === selectedFacility._id ? response.data : f
+      ));
+      setSelectedFacility(null);
+      setIsEditFacilityOpen(false);
+      toast.success('Facility updated successfully');
+    } catch (error) {
+      console.error('Error updating facility:', error);
+      toast.error('Failed to update facility');
+    }
+  };
+
   // ==================== ACHIEVEMENT HANDLERS ====================
 
   // Add achievement handler
@@ -929,6 +1317,29 @@ export function AdminPage() {
         console.error('Failed to delete achievement:', error);
         toast.error('Failed to delete achievement');
       }
+    }
+  };
+
+  // Edit achievement handler
+  const handleEditAchievement = async () => {
+    try {
+      if (!selectedAchievement) return;
+      
+      if (!selectedAchievement.title.en || !selectedAchievement.title.mr) {
+        toast.error('Achievement title is required in both languages');
+        return;
+      }
+
+      const response = await adminUpdateAchievement(selectedAchievement._id, selectedAchievement);
+      setAchievements(achievements.map(a => 
+        a._id === selectedAchievement._id ? response.data : a
+      ));
+      setSelectedAchievement(null);
+      setIsEditAchievementOpen(false);
+      toast.success('Achievement updated successfully');
+    } catch (error) {
+      console.error('Error updating achievement:', error);
+      toast.error('Failed to update achievement');
     }
   };
 
@@ -3123,14 +3534,24 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
               </p>
             </div>
             
-            <Button 
-              variant="outline" 
-              onClick={() => window.location.href = '/'}
-              className="hover-scale"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              {t({ en: 'Back to Portal', mr: 'पोर्टलवर परत' })}
-            </Button>
+            <div className="flex gap-3">
+              <Button 
+                variant="outline" 
+                onClick={() => setActiveTab('contracts')}
+                className="hover-scale bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100"
+              >
+                <FileText className="h-4 w-4 mr-2" />
+                {t({ en: 'Manage Contracts', mr: 'करार व्यवस्थापन' })}
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => window.location.href = '/'}
+                className="hover-scale"
+              >
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                {t({ en: 'Back to Portal', mr: 'पोर्टलवर परत' })}
+              </Button>
+            </div>
           </div>
         </div>
       </div>
@@ -3168,6 +3589,10 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 <TabsTrigger value="news" className="flex-1 min-w-0 justify-center px-3 py-3 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors">
                   <Newspaper className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">{t({ en: 'News', mr: 'वार्ता' })}</span>
+                </TabsTrigger>
+                <TabsTrigger value="contracts" className="flex-1 min-w-0 justify-center px-3 py-3 border-r border-gray-200 last:border-r-0 hover:bg-gray-50 transition-colors">
+                  <FileText className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">{t({ en: 'Contracts', mr: 'करार' })}</span>
                 </TabsTrigger>
               </div>
             </TabsList>
@@ -5374,7 +5799,8 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                         <SelectContent>
                           <SelectItem value="All">{t({ en: 'All Status', mr: 'सर्व स्थिती' })}</SelectItem>
                           <SelectItem value="Published">{t({ en: 'Published', mr: 'प्रकाशित' })}</SelectItem>
-                          <SelectItem value="Draft">{t({ en: 'Draft', mr: 'मसौदा' })}</SelectItem>
+                          <
+                          SelectItem value="Draft">{t({ en: 'Draft', mr: 'मसौदा' })}</SelectItem>
                           <SelectItem value="Featured">{t({ en: 'Featured', mr: 'विशेष' })}</SelectItem>
                           <SelectItem value="Breaking">{t({ en: 'Breaking', mr: 'तातडीची' })}</SelectItem>
                         </SelectContent>
@@ -5886,7 +6312,926 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
               </Card>
             </div>
           </TabsContent>
+
+          {/* Contracts Management Tab */}
+          <TabsContent value="contracts" className="space-y-6">
+            <div className="space-y-6">
+              {/* Contracts Management Header */}
+              <div className="flex flex-col lg:flex-row gap-4 lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">{t({ en: 'Contracts Content Management', mr: 'करार सामग्री व्यवस्थापन' })}</h2>
+                  <p className="text-gray-600 mt-1">{t({ en: 'Manage tenders, ongoing contracts, and completed projects', mr: 'निविदा, चालू करार आणि पूर्ण झालेले प्रकल्प व्यवस्थापित करा' })}</p>
+                </div>
+              </div>
+
+              {/* Statistics Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {projects.filter(p => p.status === 'Tender').length}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">{t({ en: 'Open Tenders', mr: 'खुले निविदा' })}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-orange-600">
+                        {projects.filter(p => p.status === 'Ongoing').length}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">{t({ en: 'Ongoing', mr: 'चालू' })}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-green-600">
+                        {projects.filter(p => p.status === 'Completed').length}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">{t({ en: 'Completed', mr: 'पूर्ण' })}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="text-center">
+                      <div className="text-2xl font-bold text-purple-600">
+                        {projects.length}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">{t({ en: 'Total Projects', mr: 'एकूण प्रकल्प' })}</div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Nested Tabs for Project Types */}
+              <Tabs defaultValue="tenders" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                  <TabsTrigger value="tenders">{t({ en: 'Open Tenders', mr: 'खुले निविदा' })}</TabsTrigger>
+                  <TabsTrigger value="ongoing">{t({ en: 'Ongoing', mr: 'चालू' })}</TabsTrigger>
+                  <TabsTrigger value="completed">{t({ en: 'Completed', mr: 'पूर्ण' })}</TabsTrigger>
+                </TabsList>
+
+                {/* Open Tenders Tab */}
+                <TabsContent value="tenders" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">{t({ en: 'Open Tenders', mr: 'खुले निविदा' })}</h3>
+                    <Button 
+                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      onClick={() => handleOpenProjectAddModal('Tender')}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t({ en: 'Add Tender', mr: 'निविदा जोडा' })}
+                    </Button>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    {projects.filter(p => p.status === 'Tender').map((tender) => (
+                      <Card key={tender._id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-lg">{tender.title.en}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{tender.title.mr}</p>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm"><strong>{t({ en: 'Department', mr: 'विभाग' })}:</strong> {tender.department.en}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Budget', mr: 'बजेट' })}:</strong> ₹{tender.estimatedBudget?.toLocaleString()}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Issue Date', mr: 'जारी दिनांक' })}:</strong> {new Date(tender.issueDate).toLocaleDateString()}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Last Date', mr: 'अंतिम दिनांक' })}:</strong> {new Date(tender.lastDate).toLocaleDateString()}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Contact', mr: 'संपर्क' })}:</strong> {tender.contactName.en} - {tender.contactPhone}</p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-1" />
+                              {t({ en: 'View', mr: 'पहा' })}
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleOpenProjectEditModal(tender)}
+                            >
+                              <Settings className="h-4 w-4 mr-1" />
+                              {t({ en: 'Edit', mr: 'संपादन' })}
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteProject(tender._id)}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              {t({ en: 'Delete', mr: 'हटवा' })}
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                    {projects.filter(p => p.status === 'Tender').length === 0 && (
+                      <Card className="p-8 text-center">
+                        <p className="text-gray-500">{t({ en: 'No open tenders found', mr: 'कोणतेही खुले निविदा सापडले नाहीत' })}</p>
+                      </Card>
+                    )}
+                  </div>
+                </TabsContent>
+
+                {/* Ongoing Contracts Tab */}
+                <TabsContent value="ongoing" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">{t({ en: 'Ongoing Contracts', mr: 'चालू करार' })}</h3>
+                    <Button 
+                      className="bg-orange-600 hover:bg-orange-700 text-white"
+                      onClick={() => handleOpenProjectAddModal('Ongoing')}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t({ en: 'Add Contract', mr: 'करार जोडा' })}
+                    </Button>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    {projects.filter(p => p.status === 'Ongoing').map((contract) => (
+                      <Card key={contract._id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-lg">{contract.title.en}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{contract.title.mr}</p>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm"><strong>{t({ en: 'Contractor', mr: 'कंत्राटदार' })}:</strong> {contract.contractor?.en}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Budget', mr: 'बजेट' })}:</strong> ₹{contract.allocatedBudget?.toLocaleString()}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Start Date', mr: 'सुरुवात दिनांक' })}:</strong> {new Date(contract.startDate).toLocaleDateString()}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Expected Completion', mr: 'अपेक्षित पूर्णता' })}:</strong> {new Date(contract.expectedCompletionDate).toLocaleDateString()}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Progress', mr: 'प्रगती' })}:</strong> {contract.progress}%</p>
+                              <p className="text-sm"><strong>{t({ en: 'Current Phase', mr: 'सध्याची टप्पा' })}:</strong> {contract.currentPhase?.en}</p>
+                            </div>
+                            <div className="mt-2">
+                              <div className="w-full bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-orange-600 h-2 rounded-full" 
+                                  style={{ width: `${contract.progress}%` }}
+                                ></div>
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleViewProjectDetails(contract)}
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              {t({ en: 'View Details', mr: 'तपशील पहा' })}
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleOpenProjectEditModal(contract)}
+                            >
+                              <Settings className="h-4 w-4 mr-1" />
+                              {t({ en: 'Edit', mr: 'संपादन' })}
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="text-green-600 hover:text-green-700"
+                              onClick={() => handleCompleteProject(contract)}
+                            >
+                              <Check className="h-4 w-4 mr-1" />
+                              {t({ en: 'Complete', mr: 'पूर्ण करा' })}
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteProject(contract._id)}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              {t({ en: 'Delete', mr: 'हटवा' })}
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                    {projects.filter(p => p.status === 'Ongoing').length === 0 && (
+                      <Card className="p-8 text-center">
+                        <p className="text-gray-500">{t({ en: 'No ongoing contracts found', mr: 'कोणतेही चालू करार सापडले नाहीत' })}</p>
+                      </Card>
+                    )}
+                  </div>
+                </TabsContent>
+
+                {/* Completed Projects Tab */}
+                <TabsContent value="completed" className="space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h3 className="text-lg font-semibold">{t({ en: 'Completed Projects', mr: 'पूर्ण झालेले प्रकल्प' })}</h3>
+                    <Button 
+                      className="bg-green-600 hover:bg-green-700 text-white"
+                      onClick={() => handleOpenProjectAddModal('Completed')}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t({ en: 'Add Completed Project', mr: 'पूर्ण प्रकल्प जोडा' })}
+                    </Button>
+                  </div>
+                  
+                  <div className="grid gap-4">
+                    {projects.filter(p => p.status === 'Completed').map((project) => (
+                      <Card key={project._id} className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-lg">{project.title.en}</h4>
+                            <p className="text-sm text-gray-600 mt-1">{project.title.mr}</p>
+                            <div className="mt-2 space-y-1">
+                              <p className="text-sm"><strong>{t({ en: 'Contractor', mr: 'कंत्राटदार' })}:</strong> {project.contractor?.en}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Total Cost', mr: 'एकूण खर्च' })}:</strong> ₹{project.totalCost?.toLocaleString()}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Completion Date', mr: 'पूर्णता दिनांक' })}:</strong> {new Date(project.completionDate).toLocaleDateString()}</p>
+                              <p className="text-sm"><strong>{t({ en: 'Rating', mr: 'रेटिंग' })}:</strong> {project.rating}/5</p>
+                              <p className="text-sm"><strong>{t({ en: 'Summary', mr: 'सारांश' })}:</strong> {project.summary?.en}</p>
+                              <p className="text-sm">
+                                <strong>{t({ en: 'Report Status', mr: 'अहवाल स्थिती' })}:</strong> 
+                                <span className={`ml-2 px-2 py-1 rounded-full text-xs ${
+                                  project.completionReportUrl 
+                                    ? 'bg-green-100 text-green-800' 
+                                    : 'bg-yellow-100 text-yellow-800'
+                                }`}>
+                                  {project.completionReportUrl 
+                                    ? t({ en: 'Report Uploaded', mr: 'अहवाल अपलोड केला' })
+                                    : t({ en: 'No Report', mr: 'अहवाल नाही' })
+                                  }
+                                </span>
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <Button variant="outline" size="sm">
+                              <Eye className="h-4 w-4 mr-1" />
+                              {t({ en: 'View', mr: 'पहा' })}
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleOpenProjectEditModal(project)}
+                            >
+                              <Settings className="h-4 w-4 mr-1" />
+                              {t({ en: 'Edit', mr: 'संपादन' })}
+                            </Button>
+                            <div className="relative">
+                              <input
+                                type="file"
+                                accept=".pdf"
+                                className="hidden"
+                                id={`pdf-upload-${project._id}`}
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    // Validate file type
+                                    if (file.type !== 'application/pdf') {
+                                      toast.error(t({ en: 'Please select a PDF file', mr: 'कृपया PDF फाइल निवडा' }));
+                                      return;
+                                    }
+                                    // Validate file size (10MB limit)
+                                    if (file.size > 10 * 1024 * 1024) {
+                                      toast.error(t({ en: 'File size must be less than 10MB', mr: 'फाइल साइज 10MB पेक्षा कमी असावी' }));
+                                      return;
+                                    }
+                                    handlePdfReportUpload(project._id, file);
+                                    // Clear the input
+                                    e.target.value = '';
+                                  }
+                                }}
+                              />
+                              {project.completionReportUrl ? (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="text-green-600 hover:text-green-700"
+                                  onClick={() => {
+                                    // Open PDF in new tab
+                                    const link = document.createElement('a');
+                                    link.href = project.completionReportUrl;
+                                    link.target = '_blank';
+                                    link.click();
+                                  }}
+                                >
+                                  <Eye className="h-4 w-4 mr-1" />
+                                  {t({ en: 'View Report', mr: 'अहवाल पहा' })}
+                                </Button>
+                              ) : (
+                                <Button 
+                                  variant="outline" 
+                                  size="sm"
+                                  className="text-blue-600 hover:text-blue-700"
+                                  onClick={() => document.getElementById(`pdf-upload-${project._id}`)?.click()}
+                                >
+                                  <FileText className="h-4 w-4 mr-1" />
+                                  {t({ en: 'Upload Report', mr: 'अहवाल अपलोड करा' })}
+                                </Button>
+                              )}
+                            </div>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleDeleteProject(project._id)}
+                            >
+                              <XCircle className="h-4 w-4 mr-1" />
+                              {t({ en: 'Delete', mr: 'हटवा' })}
+                            </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                    {projects.filter(p => p.status === 'Completed').length === 0 && (
+                      <Card className="p-8 text-center">
+                        <p className="text-gray-500">{t({ en: 'No completed projects found', mr: 'कोणतेही पूर्ण झालेले प्रकल्प सापडले नाहीत' })}</p>
+                      </Card>
+                    )}
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </div>
+          </TabsContent>
         </Tabs>
+
+        {/* Project Add/Edit Modal */}
+        <Dialog open={isProjectModalOpen} onOpenChange={setIsProjectModalOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {editingProject?._id 
+                  ? t({ en: 'Edit Project', mr: 'प्रकल्प संपादित करा' })
+                  : t({ en: 'Add New Project', mr: 'नवीन प्रकल्प जोडा' })
+                }
+              </DialogTitle>
+              <DialogDescription>
+                {editingProject?._id 
+                  ? t({ en: 'Update the project details below', mr: 'खाली प्रकल्प तपशील अपडेट करा' })
+                  : t({ en: 'Fill in the project details to create a new project', mr: 'नवीन प्रकल्प तयार करण्यासाठी प्रकल्प तपशील भरा' })
+                }
+              </DialogDescription>
+            </DialogHeader>
+            
+            <div className="space-y-6">
+              {/* Basic Information */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">{t({ en: 'Basic Information', mr: 'मूलभूत माहिती' })}</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t({ en: 'Project Title (English)', mr: 'प्रकल्प शीर्षक (इंग्रजी)' })}</Label>
+                    <Input
+                      value={editingProject?.title?.en || ''}
+                      onChange={(e) => handleProjectFormChange('title.en', e.target.value)}
+                      placeholder="Enter project title in English"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t({ en: 'Project Title (Marathi)', mr: 'प्रकल्प शीर्षक (मराठी)' })}</Label>
+                    <Input
+                      value={editingProject?.title?.mr || ''}
+                      onChange={(e) => handleProjectFormChange('title.mr', e.target.value)}
+                      placeholder="Enter project title in Marathi"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t({ en: 'Department (English)', mr: 'विभाग (इंग्रजी)' })}</Label>
+                    <Input
+                      value={editingProject?.department?.en || ''}
+                      onChange={(e) => handleProjectFormChange('department.en', e.target.value)}
+                      placeholder="Enter department in English"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t({ en: 'Department (Marathi)', mr: 'विभाग (मराठी)' })}</Label>
+                    <Input
+                      value={editingProject?.department?.mr || ''}
+                      onChange={(e) => handleProjectFormChange('department.mr', e.target.value)}
+                      placeholder="Enter department in Marathi"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t({ en: 'Contact Name (English)', mr: 'संपर्क नाव (इंग्रजी)' })}</Label>
+                    <Input
+                      value={editingProject?.contactName?.en || ''}
+                      onChange={(e) => handleProjectFormChange('contactName.en', e.target.value)}
+                      placeholder="Enter contact name in English"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t({ en: 'Contact Name (Marathi)', mr: 'संपर्क नाव (मराठी)' })}</Label>
+                    <Input
+                      value={editingProject?.contactName?.mr || ''}
+                      onChange={(e) => handleProjectFormChange('contactName.mr', e.target.value)}
+                      placeholder="Enter contact name in Marathi"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t({ en: 'Contact Phone', mr: 'संपर्क फोन' })}</Label>
+                    <Input
+                      value={editingProject?.contactPhone || ''}
+                      onChange={(e) => handleProjectFormChange('contactPhone', e.target.value)}
+                      placeholder="Enter contact phone number"
+                    />
+                  </div>
+                  <div>
+                    <Label>{t({ en: 'Estimated Budget', mr: 'अंदाजित बजेट' })}</Label>
+                    <Input
+                      type="number"
+                      value={editingProject?.estimatedBudget || ''}
+                      onChange={(e) => handleProjectFormChange('estimatedBudget', parseFloat(e.target.value) || 0)}
+                      placeholder="Enter estimated budget"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>{t({ en: 'Issue Date', mr: 'जारी दिनांक' })}</Label>
+                    <Input
+                      type="date"
+                      value={editingProject?.issueDate || ''}
+                      onChange={(e) => handleProjectFormChange('issueDate', e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t({ en: 'Last Date', mr: 'अंतिम दिनांक' })}</Label>
+                    <Input
+                      type="date"
+                      value={editingProject?.lastDate || ''}
+                      onChange={(e) => handleProjectFormChange('lastDate', e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Tender-Specific Fields */}
+              {editingProject?.status === 'Tender' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">{t({ en: 'Tender Details', mr: 'टेंडर तपशील' })}</h3>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                      <Textarea
+                        value={editingProject?.description?.en || ''}
+                        onChange={(e) => handleProjectFormChange('description.en', e.target.value)}
+                        placeholder="Enter tender description in English"
+                        rows={3}
+                      />
+                    </div>
+                    <div>
+                      <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                      <Textarea
+                        value={editingProject?.description?.mr || ''}
+                        onChange={(e) => handleProjectFormChange('description.mr', e.target.value)}
+                        placeholder="Enter tender description in Marathi"
+                        rows={3}
+                      />
+                    </div>
+                    
+                    {/* PDF Notice Upload */}
+                    <div className="space-y-2">
+                      <Label>{t({ en: 'Tender Notice PDF', mr: 'टेंडर नोटिस PDF' })}</Label>
+                      <div className="space-y-2">
+                        {editingProject?.tenderNoticeUrl && (
+                          <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                            <FileText className="h-4 w-4 text-blue-600" />
+                            <span className="text-sm text-gray-600">
+                              {t({ en: 'Notice PDF uploaded', mr: 'नोटिस PDF अपलोड केला' })}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = editingProject.tenderNoticeUrl;
+                                link.target = '_blank';
+                                link.click();
+                              }}
+                              className="text-blue-600 hover:text-blue-700"
+                            >
+                              <Eye className="h-4 w-4 mr-1" />
+                              {t({ en: 'View', mr: 'पहा' })}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleProjectFormChange('tenderNoticeUrl', '')}
+                              className="text-red-600 hover:text-red-700"
+                            >
+                              <XCircle className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        )}
+                        
+                        <div className="relative">
+                          <input
+                            type="file"
+                            accept=".pdf"
+                            className="hidden"
+                            id="tender-notice-upload"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                // Validate file type
+                                if (file.type !== 'application/pdf') {
+                                  toast.error(t({ en: 'Please select a PDF file', mr: 'कृपया PDF फाइल निवडा' }));
+                                  return;
+                                }
+                                // Validate file size (10MB limit)
+                                if (file.size > 10 * 1024 * 1024) {
+                                  toast.error(t({ en: 'File size must be less than 10MB', mr: 'फाइल साइज 10MB पेक्षा कमी असावी' }));
+                                  return;
+                                }
+                                
+                                // Convert to base64
+                                const reader = new FileReader();
+                                reader.onload = (event) => {
+                                  const base64Pdf = event.target?.result;
+                                  if (base64Pdf) {
+                                    handleProjectFormChange('tenderNoticeUrl', base64Pdf);
+                                    toast.success(t({ en: 'Tender notice uploaded successfully', mr: 'टेंडर नोटिस यशस्वीपणे अपलोड केला' }));
+                                  }
+                                };
+                                reader.readAsDataURL(file);
+                                
+                                // Clear the input
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => document.getElementById('tender-notice-upload')?.click()}
+                            className="w-full"
+                          >
+                            <FileText className="h-4 w-4 mr-2" />
+                            {editingProject?.tenderNoticeUrl 
+                              ? t({ en: 'Replace Notice PDF', mr: 'नोटिस PDF बदला' })
+                              : t({ en: 'Upload Notice PDF', mr: 'नोटिस PDF अपलोड करा' })
+                            }
+                          </Button>
+                        </div>
+                        <p className="text-xs text-gray-500">
+                          {t({ en: 'Upload the official tender notice in PDF format (max 10MB)', mr: 'अधिकृत टेंडर नोटिस PDF स्वरूपात अपलोड करा (जास्तीत जास्त 10MB)' })}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Ongoing Project Fields */}
+              {editingProject?.status === 'Ongoing' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">{t({ en: 'Ongoing Project Details', mr: 'चालू प्रकल्प तपशील' })}</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>{t({ en: 'Contractor (English)', mr: 'कंत्राटदार (इंग्रजी)' })}</Label>
+                      <Input
+                        value={editingProject?.contractor?.en || ''}
+                        onChange={(e) => handleProjectFormChange('contractor.en', e.target.value)}
+                        placeholder="Enter contractor name in English"
+                      />
+                    </div>
+                    <div>
+                      <Label>{t({ en: 'Contractor (Marathi)', mr: 'कंत्राटदार (मराठी)' })}</Label>
+                      <Input
+                        value={editingProject?.contractor?.mr || ''}
+                        onChange={(e) => handleProjectFormChange('contractor.mr', e.target.value)}
+                        placeholder="Enter contractor name in Marathi"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>{t({ en: 'Allocated Budget', mr: 'वाटप बजेट' })}</Label>
+                      <Input
+                        type="number"
+                        value={editingProject?.allocatedBudget || ''}
+                        onChange={(e) => handleProjectFormChange('allocatedBudget', parseFloat(e.target.value) || 0)}
+                        placeholder="Enter allocated budget"
+                      />
+                    </div>
+                    <div>
+                      <Label>{t({ en: 'Start Date', mr: 'सुरुवात दिनांक' })}</Label>
+                      <Input
+                        type="date"
+                        value={editingProject?.startDate || ''}
+                        onChange={(e) => handleProjectFormChange('startDate', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>{t({ en: 'Expected Completion', mr: 'अपेक्षित पूर्णता' })}</Label>
+                      <Input
+                        type="date"
+                        value={editingProject?.expectedCompletionDate || ''}
+                        onChange={(e) => handleProjectFormChange('expectedCompletionDate', e.target.value)}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>{t({ en: 'Progress (%)', mr: 'प्रगती (%)' })}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="100"
+                        value={editingProject?.progress || ''}
+                        onChange={(e) => handleProjectFormChange('progress', parseFloat(e.target.value) || 0)}
+                        placeholder="Enter progress percentage"
+                      />
+                    </div>
+                    <div>
+                      <Label>{t({ en: 'Current Phase (English)', mr: 'सध्याची टप्पा (इंग्रजी)' })}</Label>
+                      <Input
+                        value={editingProject?.currentPhase?.en || ''}
+                        onChange={(e) => handleProjectFormChange('currentPhase.en', e.target.value)}
+                        placeholder="Enter current phase in English"
+                      />
+                    </div>
+                    <div>
+                      <Label>{t({ en: 'Current Phase (Marathi)', mr: 'सध्याची टप्पा (मराठी)' })}</Label>
+                      <Input
+                        value={editingProject?.currentPhase?.mr || ''}
+                        onChange={(e) => handleProjectFormChange('currentPhase.mr', e.target.value)}
+                        placeholder="Enter current phase in Marathi"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Site Photos Section */}
+                  <div className="space-y-4">
+                    <div>
+                      <Label>{t({ en: 'Site Photos', mr: 'साइट फोटो' })}</Label>
+                      <p className="text-sm text-gray-600 mb-2">
+                        {t({ en: 'Upload photos from your computer or add URLs to track project progress', mr: 'प्रकल्प प्रगती ट्रॅक करण्यासाठी आपल्या कंप्युटरवरून फोटो अपलोड करा किंवा URL जोडा' })}
+                      </p>
+                      
+                      {/* Display existing photos */}
+                      {editingProject?.sitePhotos && editingProject.sitePhotos.length > 0 && (
+                        <div className="space-y-2 mb-4">
+                          {editingProject.sitePhotos.map((photo, index) => (
+                            <div key={index} className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                              {photo.startsWith('data:') ? (
+                                <img 
+                                  src={photo} 
+                                  alt={`Site photo ${index + 1}`}
+                                  className="w-12 h-12 object-cover rounded"
+                                  onError={(e) => {
+                                    console.log('Base64 image failed to load, size:', photo.length);
+                                    e.target.style.display = 'none';
+                                    // Show a fallback icon
+                                    e.target.nextSibling.style.display = 'block';
+                                  }}
+                                  onLoad={() => {
+                                    console.log('Base64 image loaded successfully, size:', photo.length);
+                                  }}
+                                />
+                              ) : (
+                                <img 
+                                  src={photo} 
+                                  alt={`Site photo ${index + 1}`}
+                                  className="w-12 h-12 object-cover rounded"
+                                  onError={(e) => {
+                                    console.log('URL image failed to load:', photo);
+                                    e.target.style.display = 'none';
+                                  }}
+                                />
+                              )}
+                              <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center" style={{ display: 'none' }}>
+                                <FileText className="h-4 w-4 text-gray-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-sm text-gray-600 truncate">
+                                  {photo.startsWith('data:') ? `Uploaded Image ${index + 1}` : photo}
+                                </p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  const newPhotos = editingProject.sitePhotos.filter((_, i) => i !== index);
+                                  handleProjectFormChange('sitePhotos', newPhotos);
+                                }}
+                                className="text-red-600 hover:text-red-700"
+                              >
+                                <XCircle className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      
+                      {/* Upload photo from PC */}
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="photoUpload" className="cursor-pointer">
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:border-gray-400 transition-colors">
+                              <div className="flex flex-col items-center">
+                                <Camera className="h-8 w-8 text-gray-400 mb-2" />
+                                <p className="text-sm text-gray-600 mb-1">
+                                  {t({ en: 'Click to upload photos', mr: 'फोटो अपलोड करण्यासाठी क्लिक करा' })}
+                                </p>
+                                <p className="text-xs text-gray-500">
+                                  {t({ en: 'PNG, JPG, JPEG up to 10MB', mr: 'PNG, JPG, JPEG 10MB पर्यंत' })}
+                                </p>
+                              </div>
+                            </div>
+                          </Label>
+                          <input
+                            id="photoUpload"
+                            type="file"
+                            accept="image/png,image/jpg,image/jpeg"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => {
+                              const files = Array.from(e.target.files || []) as File[];
+                              if (files.length > 0) {
+                                files.forEach((file: File) => {
+                                  // Validate file size (10MB limit)
+                                  if (file.size > 10 * 1024 * 1024) {
+                                    toast.error(t({ en: 'File size must be less than 10MB', mr: 'फाइल साइज 10MB पेक्षा कमी असावी' }));
+                                    return;
+                                  }
+                                  
+                                  // Validate file type
+                                  if (!file.type.startsWith('image/')) {
+                                    toast.error(t({ en: 'Please select only image files', mr: 'कृपया केवळ इमेज फाइल्स निवडा' }));
+                                    return;
+                                  }
+                                  
+                                  // Convert to base64 for storage
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    const base64 = event.target?.result;
+                                    if (base64) {
+                                      console.log('File converted to base64, size:', base64.length);
+                                      const currentPhotos = editingProject?.sitePhotos || [];
+                                      const newPhotos = [...currentPhotos, base64];
+                                      console.log('New photos array:', newPhotos);
+                                      handleProjectFormChange('sitePhotos', newPhotos);
+                                      toast.success(t({ en: 'Photo uploaded successfully', mr: 'फोटो यशस्वीपणे अपलोड केला' }));
+                                    } else {
+                                      console.error('Failed to convert file to base64');
+                                      toast.error(t({ en: 'Failed to upload photo', mr: 'फोटो अपलोड करण्यात अयशस्वी' }));
+                                    }
+                                  };
+                                  reader.onerror = (error) => {
+                                    console.error('FileReader error:', error);
+                                    toast.error(t({ en: 'Failed to read photo file', mr: 'फोटो फाइल वाचण्यात अयशस्वी' }));
+                                  };
+                                  reader.readAsDataURL(file);
+                                });
+                                
+                                // Clear the input
+                                e.target.value = '';
+                              }
+                            }}
+                          />
+                        </div>
+                        
+                        {/* Alternative: Add photo URL */}
+                        <div className="flex gap-2">
+                          <Input
+                            value={newPhotoUrl}
+                            onChange={(e) => setNewPhotoUrl(e.target.value)}
+                            placeholder={t({ en: 'Or enter photo URL', mr: 'किंवा फोटो URL टाका' })}
+                            className="flex-1"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => {
+                              const url = newPhotoUrl.trim();
+                              if (url) {
+                                const currentPhotos = editingProject?.sitePhotos || [];
+                                handleProjectFormChange('sitePhotos', [...currentPhotos, url]);
+                                setNewPhotoUrl('');
+                                toast.success(t({ en: 'Photo URL added successfully', mr: 'फोटो URL यशस्वीपणे जोडला' }));
+                              } else {
+                                toast.error(t({ en: 'Please enter a valid URL', mr: 'कृपया वैध URL टाका' }));
+                              }
+                            }}
+                          >
+                            <Plus className="h-4 w-4 mr-2" />
+                            {t({ en: 'Add URL', mr: 'URL जोडा' })}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Completed Project Fields */}
+              {editingProject?.status === 'Completed' && (
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">{t({ en: 'Completed Project Details', mr: 'पूर्ण झालेले प्रकल्प तपशील' })}</h3>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label>{t({ en: 'Contractor (English)', mr: 'कंत्राटदार (इंग्रजी)' })}</Label>
+                      <Input
+                        value={editingProject?.contractor?.en || ''}
+                        onChange={(e) => handleProjectFormChange('contractor.en', e.target.value)}
+                        placeholder="Enter contractor name in English"
+                      />
+                    </div>
+                    <div>
+                      <Label>{t({ en: 'Contractor (Marathi)', mr: 'कंत्राटदार (मराठी)' })}</Label>
+                      <Input
+                        value={editingProject?.contractor?.mr || ''}
+                        onChange={(e) => handleProjectFormChange('contractor.mr', e.target.value)}
+                        placeholder="Enter contractor name in Marathi"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <Label>{t({ en: 'Total Cost', mr: 'एकूण खर्च' })}</Label>
+                      <Input
+                        type="number"
+                        value={editingProject?.totalCost || ''}
+                        onChange={(e) => handleProjectFormChange('totalCost', parseFloat(e.target.value) || 0)}
+                        placeholder="Enter total cost"
+                      />
+                    </div>
+                    <div>
+                      <Label>{t({ en: 'Completion Date', mr: 'पूर्णता दिनांक' })}</Label>
+                      <Input
+                        type="date"
+                        value={editingProject?.completionDate || ''}
+                        onChange={(e) => handleProjectFormChange('completionDate', e.target.value)}
+                      />
+                    </div>
+                    <div>
+                      <Label>{t({ en: 'Rating (0-5)', mr: 'रेटिंग (0-5)' })}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        max="5"
+                        step="0.1"
+                        value={editingProject?.rating || ''}
+                        onChange={(e) => handleProjectFormChange('rating', parseFloat(e.target.value) || 0)}
+                        placeholder="Enter rating"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label>{t({ en: 'Summary (English)', mr: 'सारांश (इंग्रजी)' })}</Label>
+                    <Textarea
+                      value={editingProject?.summary?.en || ''}
+                      onChange={(e) => handleProjectFormChange('summary.en', e.target.value)}
+                      placeholder="Enter project summary in English"
+                      rows={3}
+                    />
+                  </div>
+                  <div>
+                    <Label>{t({ en: 'Summary (Marathi)', mr: 'सारांश (मराठी)' })}</Label>
+                    <Textarea
+                      value={editingProject?.summary?.mr || ''}
+                      onChange={(e) => handleProjectFormChange('summary.mr', e.target.value)}
+                      placeholder="Enter project summary in Marathi"
+                      rows={3}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsProjectModalOpen(false)}>
+                {t({ en: 'Cancel', mr: 'रद्द करा' })}
+              </Button>
+              <Button onClick={handleProjectFormSubmit}>
+                {editingProject?._id 
+                  ? t({ en: 'Update Project', mr: 'प्रकल्प अपडेट करा' })
+                  : t({ en: 'Create Project', mr: 'प्रकल्प तयार करा' })
+                }
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* News Detail Modal */}
         <Dialog open={isNewsDetailOpen} onOpenChange={setIsNewsDetailOpen}>
@@ -8798,15 +10143,54 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
               </div>
 
               <div className="space-y-2">
-                <Label>{t({ en: 'Image URL', mr: 'प्रतिमा URL' })}</Label>
-                <Input
-                  value={newLatestDevelopment.imageUrl}
-                  onChange={(e) => setNewLatestDevelopment({
-                    ...newLatestDevelopment,
-                    imageUrl: e.target.value
-                  })}
-                  placeholder="https://example.com/image.jpg"
-                />
+                <Label>{t({ en: 'Image', mr: 'प्रतिमा' })}</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={newLatestDevelopment.imageUrl}
+                    onChange={(e) => setNewLatestDevelopment({
+                      ...newLatestDevelopment,
+                      imageUrl: e.target.value
+                    })}
+                    placeholder="https://example.com/image.jpg"
+                    className="flex-1"
+                  />
+                  <div className="relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleLatestDevImageUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      disabled={isUploadingLatestDev}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={isUploadingLatestDev}
+                      className="whitespace-nowrap"
+                    >
+                      {isUploadingLatestDev ? (
+                        <>
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                          {t({ en: 'Uploading...', mr: 'अपलोड होत आहे...' })}
+                        </>
+                      ) : (
+                        <>
+                          <Upload className="h-4 w-4 mr-2" />
+                          {t({ en: 'Upload', mr: 'अपलोड' })}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+                {newLatestDevelopment.imageUrl && (
+                  <div className="mt-2">
+                    <img
+                      src={newLatestDevelopment.imageUrl}
+                      alt="Latest development preview"
+                      className="w-full h-32 object-cover rounded-md border"
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -8961,15 +10345,54 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 </div>
 
                 <div className="space-y-2">
-                  <Label>{t({ en: 'Image URL', mr: 'प्रतिमा URL' })}</Label>
-                  <Input
-                    value={selectedLatestDevelopment.imageUrl}
-                    onChange={(e) => setSelectedLatestDevelopment({
-                      ...selectedLatestDevelopment,
-                      imageUrl: e.target.value
-                    })}
-                    placeholder="https://example.com/image.jpg"
-                  />
+                  <Label>{t({ en: 'Image', mr: 'प्रतिमा' })}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      value={selectedLatestDevelopment.imageUrl}
+                      onChange={(e) => setSelectedLatestDevelopment({
+                        ...selectedLatestDevelopment,
+                        imageUrl: e.target.value
+                      })}
+                      placeholder="https://example.com/image.jpg"
+                      className="flex-1"
+                    />
+                    <div className="relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleEditLatestDevImageUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        disabled={isUploadingLatestDev}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        disabled={isUploadingLatestDev}
+                        className="whitespace-nowrap"
+                      >
+                        {isUploadingLatestDev ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                            {t({ en: 'Uploading...', mr: 'अपलोड होत आहे...' })}
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            {t({ en: 'Upload', mr: 'अपलोड' })}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                  {selectedLatestDevelopment.imageUrl && (
+                    <div className="mt-2">
+                      <img
+                        src={selectedLatestDevelopment.imageUrl}
+                        alt="Latest development preview"
+                        className="w-full h-32 object-cover rounded-md border"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -9064,7 +10487,557 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
           </DialogContent>
         </Dialog>
 
+        {/* Add Facility Dialog */}
+        <Dialog open={isAddFacilityOpen} onOpenChange={setIsAddFacilityOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{t({ en: 'Add Facility', mr: 'सुविधा जोडा' })}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Name (English)', mr: 'नाव (इंग्रजी)' })}</Label>
+                  <Input
+                    value={newFacility.name.en}
+                    onChange={(e) => setNewFacility({
+                      ...newFacility,
+                      name: { ...newFacility.name, en: e.target.value }
+                    })}
+                    placeholder="Facility Name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Name (Marathi)', mr: 'नाव (मराठी)' })}</Label>
+                  <Input
+                    value={newFacility.name.mr}
+                    onChange={(e) => setNewFacility({
+                      ...newFacility,
+                      name: { ...newFacility.name, mr: e.target.value }
+                    })}
+                    placeholder="सुविधा नाव"
+                  />
+                </div>
               </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                  <Textarea
+                    value={newFacility.description?.en || ''}
+                    onChange={(e) => setNewFacility({
+                      ...newFacility,
+                      description: { ...newFacility.description, en: e.target.value }
+                    })}
+                    placeholder="Facility description..."
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                  <Textarea
+                    value={newFacility.description?.mr || ''}
+                    onChange={(e) => setNewFacility({
+                      ...newFacility,
+                      description: { ...newFacility.description, mr: e.target.value }
+                    })}
+                    placeholder="सुविधा वर्णन..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{t({ en: 'Icon', mr: 'आयकॉन' })}</Label>
+                <Input
+                  value={newFacility.icon}
+                  onChange={(e) => setNewFacility({
+                    ...newFacility,
+                    icon: e.target.value
+                  })}
+                  placeholder="🏥 or icon name"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddFacilityOpen(false)}>
+                {t({ en: 'Cancel', mr: 'रद्द करा' })}
+              </Button>
+              <Button onClick={handleAddFacility}>
+                {t({ en: 'Add Facility', mr: 'सुविधा जोडा' })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Facility Dialog */}
+        <Dialog open={isEditFacilityOpen} onOpenChange={setIsEditFacilityOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{t({ en: 'Edit Facility', mr: 'सुविधा संपादित करा' })}</DialogTitle>
+            </DialogHeader>
+            {selectedFacility && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Name (English)', mr: 'नाव (इंग्रजी)' })}</Label>
+                    <Input
+                      value={selectedFacility.name.en}
+                      onChange={(e) => setSelectedFacility({
+                        ...selectedFacility,
+                        name: { ...selectedFacility.name, en: e.target.value }
+                      })}
+                      placeholder="Facility Name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Name (Marathi)', mr: 'नाव (मराठी)' })}</Label>
+                    <Input
+                      value={selectedFacility.name.mr}
+                      onChange={(e) => setSelectedFacility({
+                        ...selectedFacility,
+                        name: { ...selectedFacility.name, mr: e.target.value }
+                      })}
+                      placeholder="सुविधा नाव"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                    <Textarea
+                      value={selectedFacility.description?.en || ''}
+                      onChange={(e) => setSelectedFacility({
+                        ...selectedFacility,
+                        description: { ...selectedFacility.description, en: e.target.value }
+                      })}
+                      placeholder="Facility description..."
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                    <Textarea
+                      value={selectedFacility.description?.mr || ''}
+                      onChange={(e) => setSelectedFacility({
+                        ...selectedFacility,
+                        description: { ...selectedFacility.description, mr: e.target.value }
+                      })}
+                      placeholder="सुविधा वर्णन..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Icon', mr: 'आयकॉन' })}</Label>
+                  <Input
+                    value={selectedFacility.icon || ''}
+                    onChange={(e) => setSelectedFacility({
+                      ...selectedFacility,
+                      icon: e.target.value
+                    })}
+                    placeholder="🏥 or icon name"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditFacilityOpen(false)}>
+                {t({ en: 'Cancel', mr: 'रद्द करा' })}
+              </Button>
+              <Button onClick={handleEditFacility}>
+                {t({ en: 'Update Facility', mr: 'सुविधा अपडेट करा' })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Add Achievement Dialog */}
+        <Dialog open={isAddAchievementOpen} onOpenChange={setIsAddAchievementOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{t({ en: 'Add Achievement', mr: 'यशस्वीता जोडा' })}</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })}</Label>
+                  <Input
+                    value={newAchievement.title.en}
+                    onChange={(e) => setNewAchievement({
+                      ...newAchievement,
+                      title: { ...newAchievement.title, en: e.target.value }
+                    })}
+                    placeholder="Achievement Title"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</Label>
+                  <Input
+                    value={newAchievement.title.mr}
+                    onChange={(e) => setNewAchievement({
+                      ...newAchievement,
+                      title: { ...newAchievement.title, mr: e.target.value }
+                    })}
+                    placeholder="यशस्वीता शीर्षक"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                  <Textarea
+                    value={newAchievement.description?.en || ''}
+                    onChange={(e) => setNewAchievement({
+                      ...newAchievement,
+                      description: { ...newAchievement.description, en: e.target.value }
+                    })}
+                    placeholder="Achievement description..."
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                  <Textarea
+                    value={newAchievement.description?.mr || ''}
+                    onChange={(e) => setNewAchievement({
+                      ...newAchievement,
+                      description: { ...newAchievement.description, mr: e.target.value }
+                    })}
+                    placeholder="यशस्वीता वर्णन..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label>{t({ en: 'Icon', mr: 'आयकॉन' })}</Label>
+                <Input
+                  value={newAchievement.icon}
+                  onChange={(e) => setNewAchievement({
+                    ...newAchievement,
+                    icon: e.target.value
+                  })}
+                  placeholder="🏆 or icon name"
+                />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsAddAchievementOpen(false)}>
+                {t({ en: 'Cancel', mr: 'रद्द करा' })}
+              </Button>
+              <Button onClick={handleAddAchievement}>
+                {t({ en: 'Add Achievement', mr: 'यशस्वीता जोडा' })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Achievement Dialog */}
+        <Dialog open={isEditAchievementOpen} onOpenChange={setIsEditAchievementOpen}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>{t({ en: 'Edit Achievement', mr: 'यशस्वीता संपादित करा' })}</DialogTitle>
+            </DialogHeader>
+            {selectedAchievement && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })}</Label>
+                    <Input
+                      value={selectedAchievement.title.en}
+                      onChange={(e) => setSelectedAchievement({
+                        ...selectedAchievement,
+                        title: { ...selectedAchievement.title, en: e.target.value }
+                      })}
+                      placeholder="Achievement Title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</Label>
+                    <Input
+                      value={selectedAchievement.title.mr}
+                      onChange={(e) => setSelectedAchievement({
+                        ...selectedAchievement,
+                        title: { ...selectedAchievement.title, mr: e.target.value }
+                      })}
+                      placeholder="यशस्वीता शीर्षक"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</Label>
+                    <Textarea
+                      value={selectedAchievement.description?.en || ''}
+                      onChange={(e) => setSelectedAchievement({
+                        ...selectedAchievement,
+                        description: { ...selectedAchievement.description, en: e.target.value }
+                      })}
+                      placeholder="Achievement description..."
+                      rows={3}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</Label>
+                    <Textarea
+                      value={selectedAchievement.description?.mr || ''}
+                      onChange={(e) => setSelectedAchievement({
+                        ...selectedAchievement,
+                        description: { ...selectedAchievement.description, mr: e.target.value }
+                      })}
+                      placeholder="यशस्वीता वर्णन..."
+                      rows={3}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>{t({ en: 'Icon', mr: 'आयकॉन' })}</Label>
+                  <Input
+                    value={selectedAchievement.icon || ''}
+                    onChange={(e) => setSelectedAchievement({
+                      ...selectedAchievement,
+                      icon: e.target.value
+                    })}
+                    placeholder="🏆 or icon name"
+                  />
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsEditAchievementOpen(false)}>
+                {t({ en: 'Cancel', mr: 'रद्द करा' })}
+              </Button>
+              <Button onClick={handleEditAchievement}>
+                {t({ en: 'Update Achievement', mr: 'यशस्वीता अपडेट करा' })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Project Details Modal */}
+        <Dialog open={isProjectDetailOpen} onOpenChange={setIsProjectDetailOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {t({ en: 'Project Details', mr: 'प्रकल्प तपशील' })}
+              </DialogTitle>
+              <DialogDescription>
+                {t({ en: 'View complete project information', mr: 'संपूर्ण प्रकल्प माहिती पहा' })}
+              </DialogDescription>
+            </DialogHeader>
+            
+            {viewingProject && (
+              <div className="space-y-6">
+                {/* Basic Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold border-b pb-2">
+                    {t({ en: 'Basic Information', mr: 'मूलभूत माहिती' })}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <Label className="font-medium">{t({ en: 'Project Title', mr: 'प्रकल्प शीर्षक' })}</Label>
+                      <p className="text-sm text-gray-600">{viewingProject.title?.en}</p>
+                      <p className="text-sm text-gray-600">{viewingProject.title?.mr}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium">{t({ en: 'Status', mr: 'स्थिती' })}</Label>
+                      <p className="text-sm text-gray-600">
+                        <span className={`px-2 py-1 rounded-full text-xs ${
+                          viewingProject.status === 'Tender' ? 'bg-blue-100 text-blue-800' :
+                          viewingProject.status === 'Ongoing' ? 'bg-orange-100 text-orange-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {viewingProject.status}
+                        </span>
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="font-medium">{t({ en: 'Department', mr: 'विभाग' })}</Label>
+                      <p className="text-sm text-gray-600">{viewingProject.department?.en}</p>
+                      <p className="text-sm text-gray-600">{viewingProject.department?.mr}</p>
+                    </div>
+                    <div>
+                      <Label className="font-medium">{t({ en: 'Estimated Budget', mr: 'अंदाजित अंदाज' })}</Label>
+                      <p className="text-sm text-gray-600">₹{viewingProject.estimatedBudget?.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Tender Specific Information */}
+                {viewingProject.status === 'Tender' && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">
+                      {t({ en: 'Tender Information', mr: 'टेंडर माहिती' })}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Issue Date', mr: 'जारी दिनांक' })}</Label>
+                        <p className="text-sm text-gray-600">{new Date(viewingProject.issueDate).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Last Date', mr: 'अंतिम दिनांक' })}</Label>
+                        <p className="text-sm text-gray-600">{new Date(viewingProject.lastDate).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Contact Name', mr: 'संपर्क नाव' })}</Label>
+                        <p className="text-sm text-gray-600">{viewingProject.contactName?.en}</p>
+                        <p className="text-sm text-gray-600">{viewingProject.contactName?.mr}</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Contact Phone', mr: 'संपर्क फोन' })}</Label>
+                        <p className="text-sm text-gray-600">{viewingProject.contactPhone}</p>
+                      </div>
+                    </div>
+                    {viewingProject.description && (
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Description', mr: 'वर्णन' })}</Label>
+                        <p className="text-sm text-gray-600 mt-1">{viewingProject.description?.en}</p>
+                        <p className="text-sm text-gray-600">{viewingProject.description?.mr}</p>
+                      </div>
+                    )}
+                    {viewingProject.tenderNoticeUrl && (
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Tender Notice', mr: 'टेंडर नोटिस' })}</Label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = viewingProject.tenderNoticeUrl;
+                            link.target = '_blank';
+                            link.click();
+                          }}
+                          className="mt-2"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          {t({ en: 'View Notice PDF', mr: 'नोटिस PDF पहा' })}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Ongoing Project Information */}
+                {(viewingProject.status === 'Ongoing' || viewingProject.status === 'Completed') && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">
+                      {t({ en: 'Contract Information', mr: 'करार माहिती' })}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Contractor', mr: 'कंत्राटदार' })}</Label>
+                        <p className="text-sm text-gray-600">{viewingProject.contractor?.en}</p>
+                        <p className="text-sm text-gray-600">{viewingProject.contractor?.mr}</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Allocated Budget', mr: 'वाटप केलेला अंदाज' })}</Label>
+                        <p className="text-sm text-gray-600">₹{viewingProject.allocatedBudget?.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Start Date', mr: 'सुरुवात दिनांक' })}</Label>
+                        <p className="text-sm text-gray-600">{new Date(viewingProject.startDate).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Expected Completion', mr: 'अपेक्षित पूर्णता' })}</Label>
+                        <p className="text-sm text-gray-600">{new Date(viewingProject.expectedCompletionDate).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Progress', mr: 'प्रगती' })}</Label>
+                        <div className="flex items-center gap-2">
+                          <div className="w-full bg-gray-200 rounded-full h-2">
+                            <div 
+                              className="bg-orange-600 h-2 rounded-full" 
+                              style={{ width: `${viewingProject.progress}%` }}
+                            ></div>
+                          </div>
+                          <span className="text-sm text-gray-600">{viewingProject.progress}%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Current Phase', mr: 'सध्याची टप्पा' })}</Label>
+                        <p className="text-sm text-gray-600">{viewingProject.currentPhase?.en}</p>
+                        <p className="text-sm text-gray-600">{viewingProject.currentPhase?.mr}</p>
+                      </div>
+                    </div>
+
+                    {/* Site Photos */}
+                    {viewingProject.sitePhotos && viewingProject.sitePhotos.length > 0 && (
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Site Photos', mr: 'साइट फोटो' })}</Label>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-2">
+                          {viewingProject.sitePhotos.map((photo, index) => (
+                            <div key={index} className="relative">
+                              <img 
+                                src={photo} 
+                                alt={`Site photo ${index + 1}`}
+                                className="w-full h-24 object-cover rounded-lg border"
+                                onError={(e) => {
+                                  e.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Completed Project Information */}
+                {viewingProject.status === 'Completed' && (
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold border-b pb-2">
+                      {t({ en: 'Completion Information', mr: 'पूर्णता माहिती' })}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Total Cost', mr: 'एकूण खर्च' })}</Label>
+                        <p className="text-sm text-gray-600">₹{viewingProject.totalCost?.toLocaleString()}</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Completion Date', mr: 'पूर्णता दिनांक' })}</Label>
+                        <p className="text-sm text-gray-600">{new Date(viewingProject.completionDate).toLocaleDateString()}</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Rating', mr: 'रेटिंग' })}</Label>
+                        <p className="text-sm text-gray-600">{viewingProject.rating}/5</p>
+                      </div>
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Summary', mr: 'सारांश' })}</Label>
+                        <p className="text-sm text-gray-600">{viewingProject.summary?.en}</p>
+                        <p className="text-sm text-gray-600">{viewingProject.summary?.mr}</p>
+                      </div>
+                    </div>
+                    
+                    {viewingProject.completionReportUrl && (
+                      <div>
+                        <Label className="font-medium">{t({ en: 'Completion Report', mr: 'पूर्णता अहवाल' })}</Label>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = viewingProject.completionReportUrl;
+                            link.target = '_blank';
+                            link.click();
+                          }}
+                          className="mt-2"
+                        >
+                          <FileText className="h-4 w-4 mr-2" />
+                          {t({ en: 'View Completion Report', mr: 'पूर्णता अहवाल पहा' })}
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsProjectDetailOpen(false)}>
+                {t({ en: 'Close', mr: 'बंद करा' })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
     </div>
   );
 }

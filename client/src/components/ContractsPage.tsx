@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { useLanguage } from './LanguageProvider';
+import { getPublicProjects } from '../services/contractService';
 import { 
   FileBarChart,
   Search,
@@ -29,7 +30,10 @@ import {
   TrendingUp,
   Users,
   Target,
-  Award
+  Award,
+  BarChart3,
+  Wallet,
+  DollarSign
 } from 'lucide-react';
 
 export function ContractsPage() {
@@ -40,260 +44,44 @@ export function ContractsPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isProgressOpen, setIsProgressOpen] = useState(false);
   const [isReportOpen, setIsReportOpen] = useState(false);
+  const [isSitePhotosOpen, setIsSitePhotosOpen] = useState(false);
 
-  // Open Tenders Data
-  const openTenders = [
-    {
-      id: 1,
-      title: { 
-        en: 'Village Water Supply Pipeline Extension Project', 
-        mr: 'गाव पाणी पुरवठा पाइपलाइन विस्तार प्रकल्प' 
-      },
-      department: { en: 'Water Department', mr: 'पाणी विभाग' },
-      estimatedBudget: 2500000,
-      issueDate: '2024-01-15',
-      lastDate: '2024-02-15',
-      contact: {
-        name: { en: 'Mr. Rajesh Patil', mr: 'श्री. राजेश पाटील' },
-        phone: '+91 9876543210'
-      },
-      description: {
-        en: 'Extension of water supply pipeline to cover 150 additional households in Ward 4 and Ward 5',
-        mr: 'वार्ड ४ आणि वार्ड ५ मधील अतिरिक्त १५० कुटुंबांना पाणी पुरवठा पाइपलाइन विस्तार'
-      },
-      requirements: {
-        en: 'Minimum 5 years experience in pipeline projects, ISO certification required',
-        mr: 'पाइपलाइन प्रकल्पांमध्ये किमान ५ वर्षांचा अनुभव, ISO प्रमाणपत्र आवश्यक'
-      },
-      documents: ['tender_notice.pdf', 'technical_specs.pdf', 'terms_conditions.pdf']
-    },
-    {
-      id: 2,
-      title: { 
-        en: 'Village Road Construction and Repair Work', 
-        mr: 'गाव रस्ता बांधकाम आणि दुरुस्ती कार्य' 
-      },
-      department: { en: 'Public Works Department', mr: 'सार्वजनिक बांधकाम विभाग' },
-      estimatedBudget: 1800000,
-      issueDate: '2024-01-20',
-      lastDate: '2024-02-20',
-      contact: {
-        name: { en: 'Mrs. Sunita Sharma', mr: 'श्रीमती. सुनिता शर्मा' },
-        phone: '+91 9876543211'
-      },
-      description: {
-        en: 'Construction of 2.5 km concrete road from village center to school with proper drainage',
-        mr: 'गाव केंद्रापासून शाळेपर्यंत २.५ किमी काँक्रीट रस्ता बांधकाम योग्य निचरा व्यवस्थेसह'
-      },
-      requirements: {
-        en: 'Experience in road construction, Grade A contractor license required',
-        mr: 'रस्ता बांधकामाचा अनुभव, ग्रेड ए कंत्राटदार परवाना आवश्यक'
-      },
-      documents: ['tender_notice.pdf', 'site_survey.pdf', 'material_specs.pdf']
-    },
-    {
-      id: 3,
-      title: { 
-        en: 'Solar Street Light Installation Project', 
-        mr: 'सोलर स्ट्रीट लाइट स्थापना प्रकल्प' 
-      },
-      department: { en: 'Electricity Department', mr: 'विजेचा विभाग' },
-      estimatedBudget: 1200000,
-      issueDate: '2024-01-25',
-      lastDate: '2024-02-25',
-      contact: {
-        name: { en: 'Mr. Anil Kumar', mr: 'श्री. अनिल कुमार' },
-        phone: '+91 9876543212'
-      },
-      description: {
-        en: 'Installation of 50 solar street lights across main village roads with 3-year maintenance',
-        mr: 'मुख्य गाव रस्त्यांवर ५० सोलर स्ट्रीट लाइट स्थापना ३ वर्षांच्या देखभालीसह'
-      },
-      requirements: {
-        en: 'Solar equipment installation experience, electrical contractor license',
-        mr: 'सोलर उपकरण स्थापनेचा अनुभव, इलेक्ट्रिकल कंत्राटदार परवाना'
-      },
-      documents: ['tender_notice.pdf', 'technical_specs.pdf', 'location_map.pdf']
-    }
-  ];
+  // Dynamic data state
+  const [openTenders, setOpenTenders] = useState([]);
+  const [ongoingContracts, setOngoingContracts] = useState([]);
+  const [completedContracts, setCompletedContracts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  // Ongoing Contracts Data
-  const ongoingContracts = [
-    {
-      id: 1,
-      title: { 
-        en: 'Community Center Construction', 
-        mr: 'सामुदायिक केंद्र बांधकाम' 
-      },
-      contractor: { en: 'ABC Construction Ltd.', mr: 'एबीसी कन्स्ट्रक्शन लिमिटेड' },
-      allocatedBudget: 3500000,
-      startDate: '2023-11-01',
-      expectedCompletion: '2024-05-01',
-      progress: 75,
-      sitePhoto: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb25zdHJ1Y3Rpb24lMjBzaXRlfGVufDB8fHx8MTczNzAzODQwMHww&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      status: 'ongoing',
-      currentPhase: {
-        en: 'Interior finishing work in progress',
-        mr: 'आंतरिक फिनिशिंग कार्य सुरू आहे'
-      },
-      timeline: [
-        { phase: { en: 'Foundation', mr: 'पाया' }, completed: true, date: '2023-12-15' },
-        { phase: { en: 'Structure', mr: 'संरचना' }, completed: true, date: '2024-01-30' },
-        { phase: { en: 'Roofing', mr: 'छत' }, completed: true, date: '2024-02-28' },
-        { phase: { en: 'Interior', mr: 'आंतरिक' }, completed: false, date: '2024-04-15' },
-        { phase: { en: 'Finishing', mr: 'फिनिशिंग' }, completed: false, date: '2024-05-01' }
-      ]
-    },
-    {
-      id: 2,
-      title: { 
-        en: 'Drainage System Development', 
-        mr: 'पाणी निचरा प्रणाली विकास' 
-      },
-      contractor: { en: 'XYZ Infrastructure Pvt.', mr: 'एक्सवायझेड इन्फ्रास्ट्रक्चर प्रायव्हेट' },
-      allocatedBudget: 2200000,
-      startDate: '2024-01-15',
-      expectedCompletion: '2024-06-15',
-      progress: 45,
-      sitePhoto: 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkcmFpbmFnZSUyMGNvbnN0cnVjdGlvbnxlbnwwfHx8fDE3MzcwMzg0MDB8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      status: 'ongoing',
-      currentPhase: {
-        en: 'Pipeline laying in Ward 2',
-        mr: 'वार्ड २ मध्ये पाइपलाइन टाकणे'
-      },
-      timeline: [
-        { phase: { en: 'Survey & Planning', mr: 'सर्वेक्षण आणि नियोजन' }, completed: true, date: '2024-02-01' },
-        { phase: { en: 'Excavation', mr: 'खोदकाम' }, completed: true, date: '2024-03-01' },
-        { phase: { en: 'Pipeline Installation', mr: 'पाइपलाइन स्थापना' }, completed: false, date: '2024-05-01' },
-        { phase: { en: 'Testing & Commissioning', mr: 'चाचणी आणि सुरुवात' }, completed: false, date: '2024-06-15' }
-      ]
-    },
-    {
-      id: 3,
-      title: { 
-        en: 'School Building Renovation', 
-        mr: 'शाळा इमारत नूतनीकरण' 
-      },
-      contractor: { en: 'Village Builders Co.', mr: 'व्हिलेज बिल्डर्स कंपनी' },
-      allocatedBudget: 1800000,
-      startDate: '2023-12-01',
-      expectedCompletion: '2024-04-01',
-      progress: 85,
-      sitePhoto: 'https://images.unsplash.com/photo-1580582932707-520aed937b7b?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxzY2hvb2wlMjBidWlsZGluZyUyMHJlbm92YXRpb258ZW58MHx8fHwxNzM3MDM4NDAwfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      status: 'ongoing',
-      currentPhase: {
-        en: 'Final painting and electrical work',
-        mr: 'अंतिम रंगकाम आणि विद्युत कार्य'
-      },
-      timeline: [
-        { phase: { en: 'Demolition', mr: 'पाडणे' }, completed: true, date: '2023-12-15' },
-        { phase: { en: 'Structural Repair', mr: 'संरचनात्मक दुरुस्ती' }, completed: true, date: '2024-01-15' },
-        { phase: { en: 'Flooring & Walls', mr: 'फरशी आणि भिंती' }, completed: true, date: '2024-02-28' },
-        { phase: { en: 'Electrical & Plumbing', mr: 'विद्युत आणि प्लंबिंग' }, completed: false, date: '2024-03-15' },
-        { phase: { en: 'Final Touches', mr: 'अंतिम स्पर्श' }, completed: false, date: '2024-04-01' }
-      ]
-    }
-  ];
+  // Fetch projects data
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        setLoading(true);
+        
+        // Fetch all three statuses concurrently
+        const [tendersRes, ongoingRes, completedRes] = await Promise.all([
+          getPublicProjects({ status: 'Tender' }),
+          getPublicProjects({ status: 'Ongoing' }),
+          getPublicProjects({ status: 'Completed' })
+        ]);
 
-  // Completed Contracts Data
-  const completedContracts = [
-    {
-      id: 1,
-      title: { 
-        en: 'Village Main Road Concretization', 
-        mr: 'गाव मुख्य रस्ता काँक्रीटीकरण' 
-      },
-      contractor: { en: 'Perfect Roads Ltd.', mr: 'परफेक्ट रोड्स लिमिटेड' },
-      totalCost: 4200000,
-      completionDate: '2023-10-15',
-      finalPhoto: 'https://images.unsplash.com/photo-1548618447-14dc67c0d8f7?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxjb25jcmV0ZSUyMHJvYWR8ZW58MHx8fHwxNzM3MDM4NDAwfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      rating: 4.8,
-      summary: {
-        en: '3.2 km main road successfully completed with high-quality concrete and proper drainage',
-        mr: '३.२ किमी मुख्य रस्ता उच्च दर्जाच्या काँक्रीट आणि योग्य निचरा व्यवस्थेसह यशस्वीपणे पूर्ण'
-      },
-      deliverables: [
-        { item: { en: 'Road Length', mr: 'रस्त्याची लांबी' }, value: '3.2 km' },
-        { item: { en: 'Drainage Lines', mr: 'निचरा रेषा' }, value: '2.8 km' },
-        { item: { en: 'Street Lights', mr: 'रस्ते दिवे' }, value: '32 units' }
-      ]
-    },
-    {
-      id: 2,
-      title: { 
-        en: 'Primary Health Center Building', 
-        mr: 'प्राथमिक आरोग्य केंद्र इमारत' 
-      },
-      contractor: { en: 'HealthCare Construction', mr: 'हेल्थकेयर कन्स्ट्रक्शन' },
-      totalCost: 5800000,
-      completionDate: '2023-09-30',
-      finalPhoto: 'https://images.unsplash.com/photo-1551076805-e1869033e561?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoZWFsdGglMjBjZW50ZXIlMjBidWlsZGluZ3xlbnwwfHx8fDE3MzcwMzg0MDB8MA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      rating: 4.9,
-      summary: {
-        en: 'Modern primary health center with 15 beds, emergency room, and medical equipment',
-        mr: 'आधुनिक प्राथमिक आरोग्य केंद्र १५ बेड, आपत्कालीन कक्ष आणि वैद्यकीय उपकरणांसह'
-      },
-      deliverables: [
-        { item: { en: 'Total Area', mr: 'एकूण क्षेत्रफळ' }, value: '2,500 sq ft' },
-        { item: { en: 'Patient Beds', mr: 'रुग्ण बेड' }, value: '15 units' },
-        { item: { en: 'Medical Equipment', mr: 'वैद्यकीय उपकरणे' }, value: 'Complete Set' }
-      ]
-    },
-    {
-      id: 3,
-      title: { 
-        en: 'Water Storage Tank Construction', 
-        mr: 'पाणी साठवण टाकी बांधकाम' 
-      },
-      contractor: { en: 'AquaTech Builders', mr: 'एक्वाटेक बिल्डर्स' },
-      totalCost: 1500000,
-      completionDate: '2023-08-20',
-      finalPhoto: 'https://images.unsplash.com/photo-1581094794329-c8112a89af12?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx3YXRlciUyMHRhbmt8ZW58MHx8fHwxNzM3MDM4NDAwfDA&ixlib=rb-4.1.0&q=80&w=1080&utm_source=figma&utm_medium=referral',
-      rating: 4.7,
-      summary: {
-        en: 'Underground water storage tank with 500,000 liters capacity and automated supply system',
-        mr: 'भूगर्भीय पाणी साठवण टाकी ५,००,००० लिटर क्षमता आणि स्वयंचलित पुरवठा प्रणालीसह'
-      },
-      deliverables: [
-        { item: { en: 'Storage Capacity', mr: 'साठवण क्षमता' }, value: '5,00,000 liters' },
-        { item: { en: 'Pipeline Network', mr: 'पाइपलाइन नेटवर्क' }, value: '1.5 km' },
-        { item: { en: 'Auto Supply System', mr: 'स्वयंचलित पुरवठा प्रणाली' }, value: 'Installed' }
-      ]
-    }
-  ];
+        setOpenTenders(tendersRes.data || []);
+        setOngoingContracts(ongoingRes.data || []);
+        setCompletedContracts(completedRes.data || []);
+      } catch (error) {
+        console.error('Failed to fetch projects:', error);
+        // Set empty arrays on error
+        setOpenTenders([]);
+        setOngoingContracts([]);
+        setCompletedContracts([]);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-  // Filter functions
-  const getFilteredTenders = () => {
-    return openTenders.filter(tender => {
-      const matchesSearch = tender.title.en.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           tender.title.mr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           tender.department.en.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
-    });
-  };
+    fetchProjects();
+  }, [searchTerm, statusFilter]);
 
-  const getFilteredOngoing = () => {
-    let filtered = ongoingContracts;
-    if (statusFilter !== 'All') {
-      // For ongoing contracts, we could filter by progress ranges if needed
-      filtered = ongoingContracts;
-    }
-    return filtered.filter(contract => {
-      const matchesSearch = contract.title.en.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           contract.title.mr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           contract.contractor.en.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
-    });
-  };
-
-  const getFilteredCompleted = () => {
-    return completedContracts.filter(contract => {
-      const matchesSearch = contract.title.en.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           contract.title.mr.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                           contract.contractor.en.toLowerCase().includes(searchTerm.toLowerCase());
-      return matchesSearch;
-    });
-  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-IN', {
@@ -380,7 +168,7 @@ export function ContractsPage() {
               <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-2">
                 <AlertCircle className="h-6 w-6 text-white" />
               </div>
-              <div className="text-2xl font-bold text-green-600">{openTenders.length}</div>
+              <div className="text-2xl font-bold text-green-600">{loading ? '...' : openTenders.length}</div>
               <div className="text-sm text-gray-600">{t({ en: 'Open Tenders', mr: 'खुल्या निविदा' })}</div>
             </CardContent>
           </Card>
@@ -390,7 +178,7 @@ export function ContractsPage() {
               <div className="w-12 h-12 bg-orange-500 rounded-full flex items-center justify-center mx-auto mb-2">
                 <PlayCircle className="h-6 w-6 text-white" />
               </div>
-              <div className="text-2xl font-bold text-orange-600">{ongoingContracts.length}</div>
+              <div className="text-2xl font-bold text-orange-600">{loading ? '...' : ongoingContracts.length}</div>
               <div className="text-sm text-gray-600">{t({ en: 'Ongoing', mr: 'सुरू आहे' })}</div>
             </CardContent>
           </Card>
@@ -400,7 +188,7 @@ export function ContractsPage() {
               <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center mx-auto mb-2">
                 <CheckCircle className="h-6 w-6 text-white" />
               </div>
-              <div className="text-2xl font-bold text-blue-600">{completedContracts.length}</div>
+              <div className="text-2xl font-bold text-blue-600">{loading ? '...' : completedContracts.length}</div>
               <div className="text-sm text-gray-600">{t({ en: 'Completed', mr: 'पूर्ण झाले' })}</div>
             </CardContent>
           </Card>
@@ -411,9 +199,9 @@ export function ContractsPage() {
                 <IndianRupee className="h-6 w-6 text-white" />
               </div>
               <div className="text-2xl font-bold text-purple-600">
-                {formatCurrency(
+                {loading ? '...' : formatCurrency(
                   [...openTenders, ...ongoingContracts, ...completedContracts].reduce((total, item) => 
-                    total + (item.estimatedBudget || item.allocatedBudget || item.totalCost), 0
+                    total + (item.estimatedBudget || item.allocatedBudget || item.totalCost || 0), 0
                   )
                 ).slice(0, -3)}K
               </div>
@@ -429,11 +217,20 @@ export function ContractsPage() {
             <h2 className="text-2xl font-bold text-gray-900">
               {t({ en: 'Open Tenders', mr: 'खुल्या निविदा' })}
             </h2>
-            <Badge className="bg-green-500 text-white">{getFilteredTenders().length}</Badge>
+            <Badge className="bg-green-500 text-white">{loading ? '...' : openTenders.length}</Badge>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {getFilteredTenders().map((tender, index) => (
+            {loading ? (
+              <div className="col-span-full text-center py-12">
+                <div className="text-gray-500">Loading tenders...</div>
+              </div>
+            ) : openTenders.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <div className="text-gray-500">No open tenders found</div>
+              </div>
+            ) : (
+              openTenders.map((tender, index) => (
               <Card key={tender.id} className="border-0 shadow-xl glass-effect hover-lift animate-slide-in-right" style={{ animationDelay: `${index * 0.1}s` }}>
                 <CardHeader className="pb-3">
                   <div className="flex items-start justify-between">
@@ -477,10 +274,10 @@ export function ContractsPage() {
                   <div className="flex items-center gap-2 text-sm">
                     <User className="h-4 w-4 text-gray-500" />
                     <div>
-                      <div className="font-medium">{t(tender.contact.name)}</div>
+                      <div className="font-medium">{t(tender.contactName || { en: 'N/A', mr: 'N/A' })}</div>
                       <div className="text-gray-500 flex items-center gap-1">
                         <Phone className="h-3 w-3" />
-                        {tender.contact.phone}
+                        {tender.contactPhone || 'N/A'}
                       </div>
                     </div>
                   </div>
@@ -497,7 +294,8 @@ export function ContractsPage() {
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+              ))
+            )}
           </div>
         </section>
 
@@ -508,11 +306,20 @@ export function ContractsPage() {
             <h2 className="text-2xl font-bold text-gray-900">
               {t({ en: 'Ongoing Contracts', mr: 'सुरू असलेले कंत्राटे' })}
             </h2>
-            <Badge className="bg-orange-500 text-white">{getFilteredOngoing().length}</Badge>
+            <Badge className="bg-orange-500 text-white">{loading ? '...' : ongoingContracts.length}</Badge>
           </div>
           
           <div className="space-y-6">
-            {getFilteredOngoing().map((contract, index) => (
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="text-gray-500">Loading ongoing contracts...</div>
+              </div>
+            ) : ongoingContracts.length === 0 ? (
+              <div className="text-center py-12">
+                <div className="text-gray-500">No ongoing contracts found</div>
+              </div>
+            ) : (
+              ongoingContracts.map((contract, index) => (
               <Card key={contract.id} className="border-0 shadow-xl glass-effect hover-lift animate-slide-in-left" style={{ animationDelay: `${index * 0.1}s` }}>
                 <CardContent className="p-6">
                   <div className="grid md:grid-cols-4 gap-6">
@@ -540,7 +347,7 @@ export function ContractsPage() {
                         </div>
                         <div>
                           <div className="text-gray-500">{t({ en: 'Expected Completion', mr: 'अपेक्षित पूर्णता' })}</div>
-                          <div className="font-medium">{formatDate(contract.expectedCompletion)}</div>
+                          <div className="font-medium">{formatDate(contract.expectedCompletionDate)}</div>
                         </div>
                       </div>
                       
@@ -555,18 +362,21 @@ export function ContractsPage() {
                         />
                       </div>
                       
-                      <p className="text-sm text-gray-600 mb-4">{t(contract.currentPhase)}</p>
+                      <p className="text-sm text-gray-600 mb-4">{t(contract.currentPhase || { en: 'N/A', mr: 'N/A' })}</p>
                     </div>
                     
                     {/* Site Photo */}
                     <div className="flex flex-col items-center">
                       <div className="mb-3">
                         <ImageWithFallback
-                          src={contract.sitePhoto}
+                          src={contract.sitePhotos?.[0] || contract.sitePhoto}
                           alt={t(contract.title)}
                           className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
                           onClick={() => {
-                            // Could open image in full view
+                            if (contract.sitePhotos && contract.sitePhotos.length > 0) {
+                              setSelectedContract(contract);
+                              setIsSitePhotosOpen(true);
+                            }
                           }}
                         />
                       </div>
@@ -584,24 +394,32 @@ export function ContractsPage() {
                         }}
                         className="bg-orange-500 hover:bg-orange-600 text-white"
                       >
-                        <TrendingUp className="h-4 w-4 mr-2" />
-                        {t({ en: 'View Progress', mr: 'प्रगती पहा' })}
+                        <Eye className="h-4 w-4 mr-2" />
+                        {t({ en: 'View Detail', mr: 'तपशील पहा' })}
                       </Button>
                       
-                      <Button variant="outline" className="border-gray-300">
+                      <Button 
+                        variant="outline" 
+                        className="border-gray-300"
+                        onClick={() => {
+                          if (contract.sitePhotos && contract.sitePhotos.length > 0) {
+                            setSelectedContract(contract);
+                            setIsSitePhotosOpen(true);
+                          } else {
+                            // Show a message if no photos available
+                            alert(t({ en: 'No site photos available', mr: 'साइट फोटो उपलब्ध नाहीत' }));
+                          }
+                        }}
+                      >
                         <Camera className="h-4 w-4 mr-2" />
                         {t({ en: 'Site Photos', mr: 'साइट फोटो' })}
-                      </Button>
-                      
-                      <Button variant="outline" className="border-gray-300">
-                        <FileText className="h-4 w-4 mr-2" />
-                        {t({ en: 'Documents', mr: 'कागदपत्रे' })}
                       </Button>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              ))
+            )}
           </div>
         </section>
 
@@ -612,15 +430,24 @@ export function ContractsPage() {
             <h2 className="text-2xl font-bold text-gray-900">
               {t({ en: 'Completed Contracts', mr: 'पूर्ण झालेले कंत्राटे' })}
             </h2>
-            <Badge className="bg-blue-500 text-white">{getFilteredCompleted().length}</Badge>
+            <Badge className="bg-blue-500 text-white">{loading ? '...' : completedContracts.length}</Badge>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {getFilteredCompleted().map((contract, index) => (
+            {loading ? (
+              <div className="col-span-full text-center py-12">
+                <div className="text-gray-500">Loading completed contracts...</div>
+              </div>
+            ) : completedContracts.length === 0 ? (
+              <div className="col-span-full text-center py-12">
+                <div className="text-gray-500">No completed contracts found</div>
+              </div>
+            ) : (
+              completedContracts.map((contract, index) => (
               <Card key={contract.id} className="border-0 shadow-xl glass-effect hover-lift animate-scale-in" style={{ animationDelay: `${index * 0.1}s` }}>
                 <div className="relative">
                   <ImageWithFallback
-                    src={contract.finalPhoto}
+                    src={contract.finalPhotos?.[0] || contract.finalPhoto}
                     alt={t(contract.title)}
                     className="w-full h-48 object-cover rounded-t-lg"
                   />
@@ -668,7 +495,8 @@ export function ContractsPage() {
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+              ))
+            )}
           </div>
         </section>
       </div>
@@ -691,12 +519,7 @@ export function ContractsPage() {
                   
                   <div>
                     <h4 className="font-semibold">{t({ en: 'Description', mr: 'वर्णन' })}</h4>
-                    <p className="text-gray-600">{t(selectedContract.description)}</p>
-                  </div>
-                  
-                  <div>
-                    <h4 className="font-semibold">{t({ en: 'Requirements', mr: 'आवश्यकता' })}</h4>
-                    <p className="text-gray-600">{t(selectedContract.requirements)}</p>
+                    <p className="text-gray-600">{t(selectedContract.description || { en: 'No description available', mr: 'वर्णन उपलब्ध नाही' })}</p>
                   </div>
                 </div>
 
@@ -726,18 +549,40 @@ export function ContractsPage() {
                   <div>
                     <h4 className="font-semibold">{t({ en: 'Contact Person', mr: 'संपर्क व्यक्ती' })}</h4>
                     <div className="bg-gray-50 p-3 rounded-lg">
-                      <p className="font-medium">{t(selectedContract.contact.name)}</p>
+                      <p className="font-medium">{t(selectedContract.contactName || { en: 'N/A', mr: 'N/A' })}</p>
                       <p className="text-gray-600 flex items-center gap-2">
                         <Phone className="h-4 w-4" />
-                        {selectedContract.contact.phone}
+                        {selectedContract.contactPhone || 'N/A'}
                       </p>
                     </div>
                   </div>
                   
                   <div>
-                    <h4 className="font-semibold mb-2">{t({ en: 'Download Documents', mr: 'कागदपत्रे डाउनलोड करा' })}</h4>
+                    <h4 className="font-semibold mb-2">{t({ en: 'Tender Notice', mr: 'निविदा सूचना' })}</h4>
                     <div className="space-y-2">
-                      {selectedContract.documents.map((doc, index) => (
+                      {selectedContract.tenderNoticeUrl ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="w-full justify-start"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = selectedContract.tenderNoticeUrl;
+                            link.target = '_blank';
+                            link.click();
+                          }}
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          {t({ en: 'Download Tender Notice (PDF)', mr: 'निविदा सूचना डाउनलोड करा (PDF)' })}
+                        </Button>
+                      ) : (
+                        <p className="text-gray-500 text-sm">{t({ en: 'No tender notice available', mr: 'निविदा सूचना उपलब्ध नाही' })}</p>
+                      )}
+                      
+                      {selectedContract.tenderDocuments?.length > 0 && (
+                        <>
+                          <h5 className="font-medium mt-4 mb-2">{t({ en: 'Additional Documents', mr: 'अतिरिक्त कागदपत्रे' })}</h5>
+                          {selectedContract.tenderDocuments.map((doc, index) => (
                         <Button
                           key={index}
                           variant="outline"
@@ -745,9 +590,11 @@ export function ContractsPage() {
                           className="w-full justify-start"
                         >
                           <Download className="h-4 w-4 mr-2" />
-                          {doc}
+                              {doc.name || doc}
                         </Button>
                       ))}
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -763,83 +610,264 @@ export function ContractsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Progress Dialog */}
+      {/* Project Detail Dialog for Ongoing Contracts */}
       <Dialog open={isProgressOpen} onOpenChange={setIsProgressOpen}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{t({ en: 'Project Progress', mr: 'प्रकल्प प्रगती' })}</DialogTitle>
+            <DialogTitle className="text-2xl font-bold">{t({ en: 'Project Details', mr: 'प्रकल्प तपशील' })}</DialogTitle>
           </DialogHeader>
 
           {selectedContract && 'progress' in selectedContract && (
-            <div className="space-y-6">
+            <div className="space-y-8">
+              {/* Project Header */}
+              <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-6 rounded-lg">
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Left Side - Title and Status */}
+                  <div>
+                    <div className="flex items-center gap-3 mb-3">
+                      <Badge className="bg-orange-500 text-white text-lg px-4 py-2">
+                        {t({ en: 'Ongoing Project', mr: 'चालू प्रकल्प' })}
+                      </Badge>
+                    </div>
+                    <h3 className="text-3xl font-bold text-gray-900 mb-3">{t(selectedContract.title)}</h3>
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Building2 className="h-4 w-4 text-gray-500" />
+                        <span className="text-gray-700">{t(selectedContract.department)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Calendar className="h-4 w-4 text-gray-500" />
+                        <span className="text-gray-700">{t({ en: 'Tender Issued', mr: 'निविदा जारी' })}: {formatDate(selectedContract.issueDate)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="h-4 w-4 text-gray-500" />
+                        <span className="text-gray-700">{t({ en: 'Tender Deadline', mr: 'निविदा मुदत' })}: {formatDate(selectedContract.lastDate)}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Right Side - Progress */}
+                  <div className="flex flex-col items-end">
               <div className="text-center">
-                <h3 className="text-xl font-bold mb-2">{t(selectedContract.title)}</h3>
-                <div className="flex justify-center items-center gap-4 mb-4">
-                  <div className="text-3xl font-bold text-orange-600">{selectedContract.progress}%</div>
-                  <div className="text-gray-600">{t({ en: 'Complete', mr: 'पूर्ण' })}</div>
+                      <div className="text-5xl font-bold text-orange-600 mb-2">{selectedContract.progress}%</div>
+                      <div className="text-gray-600 text-lg">{t({ en: 'Complete', mr: 'पूर्ण' })}</div>
                 </div>
-                <Progress value={selectedContract.progress} className="h-4 mb-4" />
-                <p className="text-gray-600">{t(selectedContract.currentPhase)}</p>
+                    <div className="w-full mt-4">
+                      <Progress value={selectedContract.progress} className="h-4" />
+                    </div>
+                  </div>
               </div>
 
+                {/* Current Phase Section */}
+                <div className="mt-6 pt-6 border-t border-orange-200">
+                  <h4 className="font-semibold text-gray-700 mb-2">{t({ en: 'Current Phase', mr: 'सध्याचा टप्पा' })}</h4>
+                  <p className="text-lg text-gray-800">{t(selectedContract.currentPhase || { en: 'N/A', mr: 'N/A' })}</p>
+                </div>
+              </div>
+
+              {/* Main Content Grid */}
+              <div className="grid lg:grid-cols-3 gap-8">
+                {/* Project Information */}
+                <div className="lg:col-span-2 space-y-6">
+                  {/* Tender Information */}
+                  <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <h4 className="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      {t({ en: 'Tender Information', mr: 'निविदा माहिती' })}
+                    </h4>
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <h4 className="font-bold text-lg mb-4">{t({ en: 'Project Timeline', mr: 'प्रकल्प वेळापत्रक' })}</h4>
+                        <h5 className="font-semibold text-gray-700 mb-2">{t({ en: 'Original Budget', mr: 'मूळ बजेट' })}</h5>
+                        <p className="text-xl font-bold text-blue-600">{formatCurrency(selectedContract.estimatedBudget)}</p>
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-gray-700 mb-2">{t({ en: 'Contact Person', mr: 'संपर्क व्यक्ती' })}</h5>
+                        <div className="text-gray-600">
+                          <p>{t(selectedContract.contactName)}</p>
+                          <p className="text-sm text-gray-500">{selectedContract.contactPhone}</p>
+                        </div>
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-gray-700 mb-2">{t({ en: 'Tender Issue Date', mr: 'निविदा जारी दिनांक' })}</h5>
+                        <p className="text-gray-600">{formatDate(selectedContract.issueDate)}</p>
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-gray-700 mb-2">{t({ en: 'Tender Deadline', mr: 'निविदा मुदत' })}</h5>
+                        <p className="text-gray-600">{formatDate(selectedContract.lastDate)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Project Information */}
+                  <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <h4 className="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
+                      <TrendingUp className="h-5 w-5" />
+                      {t({ en: 'Project Information', mr: 'प्रकल्प माहिती' })}
+                    </h4>
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div>
+                        <h5 className="font-semibold text-gray-700 mb-2">{t({ en: 'Contractor', mr: 'कंत्राटदार' })}</h5>
+                        <p className="text-gray-600">{t(selectedContract.contractor)}</p>
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-gray-700 mb-2">{t({ en: 'Budget Allocated', mr: 'वाटप केलेले बजेट' })}</h5>
+                        <p className="text-2xl font-bold text-orange-600">{formatCurrency(selectedContract.allocatedBudget)}</p>
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-gray-700 mb-2">{t({ en: 'Start Date', mr: 'सुरुवात दिनांक' })}</h5>
+                        <p className="text-gray-600">{formatDate(selectedContract.startDate)}</p>
+                      </div>
+                      <div>
+                        <h5 className="font-semibold text-gray-700 mb-2">{t({ en: 'Expected Completion', mr: 'अपेक्षित पूर्णता' })}</h5>
+                        <p className="text-gray-600">{formatDate(selectedContract.expectedCompletionDate)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Timeline Section */}
+                  <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <h4 className="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
+                      <Clock className="h-5 w-5" />
+                      {t({ en: 'Project Timeline', mr: 'प्रकल्प वेळापत्रक' })}
+                    </h4>
                   <div className="space-y-4">
-                    {selectedContract.timeline.map((phase, index) => (
-                      <div key={index} className="flex items-center gap-4">
-                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
-                          phase.completed ? 'bg-green-500 text-white' : 'bg-gray-200 text-gray-500'
+                      {selectedContract.timeline && selectedContract.timeline.length > 0 ? (
+                        selectedContract.timeline.map((phase, index) => (
+                          <div key={index} className="flex items-center gap-4 p-4 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border-l-4 border-l-orange-400">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                              phase.completed ? 'bg-green-500 text-white shadow-lg' : 'bg-gray-200 text-gray-500'
                         }`}>
                           {phase.completed ? (
-                            <CheckCircle className="h-4 w-4" />
+                                <CheckCircle className="h-6 w-6" />
                           ) : (
-                            <Clock className="h-4 w-4" />
+                                <Clock className="h-6 w-6" />
                           )}
                         </div>
                         <div className="flex-1">
-                          <div className="font-medium">{t(phase.phase)}</div>
-                          <div className="text-sm text-gray-500">{formatDate(phase.date)}</div>
+                              <div className="font-semibold text-gray-800 text-lg">{t(phase.phase)}</div>
+                              <div className="text-gray-600 flex items-center gap-2">
+                                <Calendar className="h-4 w-4" />
+                                {formatDate(phase.date)}
+                              </div>
                         </div>
                         {phase.completed && (
-                          <Badge className="bg-green-500 text-white">
+                              <Badge className="bg-green-500 text-white px-3 py-1">
                             {t({ en: 'Completed', mr: 'पूर्ण' })}
                           </Badge>
                         )}
                       </div>
-                    ))}
+                        ))
+                      ) : (
+                        <div className="text-center py-8 bg-gray-50 rounded-lg">
+                          <Clock className="h-12 w-12 text-gray-400 mx-auto mb-3" />
+                          <p className="text-gray-500 italic">{t({ en: 'No timeline information available', mr: 'वेळापत्रक माहिती उपलब्ध नाही' })}</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                <div>
-                  <h4 className="font-bold text-lg mb-4">{t({ en: 'Project Details', mr: 'प्रकल्प तपशील' })}</h4>
-                  <div className="space-y-4">
-                    <div>
-                      <h5 className="font-semibold">{t({ en: 'Contractor', mr: 'कंत्राटदार' })}</h5>
-                      <p>{t(selectedContract.contractor)}</p>
-                    </div>
-                    <div>
-                      <h5 className="font-semibold">{t({ en: 'Budget Allocated', mr: 'वाटप केलेले बजेट' })}</h5>
-                      <p className="text-xl font-bold text-orange-600">{formatCurrency(selectedContract.allocatedBudget)}</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <h5 className="font-semibold">{t({ en: 'Start Date', mr: 'सुरुवात दिनांक' })}</h5>
-                        <p>{formatDate(selectedContract.startDate)}</p>
+                {/* Site Photos Sidebar */}
+                <div className="space-y-6">
+                  <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <h4 className="font-bold text-lg mb-4 text-gray-800">{t({ en: 'Site Photos', mr: 'साइट फोटो' })}</h4>
+                    {selectedContract.sitePhotos && selectedContract.sitePhotos.length > 0 ? (
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                          {selectedContract.sitePhotos.slice(0, 3).map((photo, index) => (
+                            <ImageWithFallback
+                              key={index}
+                              src={photo}
+                              alt={`${t(selectedContract.title)} - Photo ${index + 1}`}
+                              className="w-full h-32 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                              onClick={() => {
+                                setSelectedContract({...selectedContract, currentPhotoIndex: index});
+                                setIsSitePhotosOpen(true);
+                              }}
+                            />
+                    ))}
+                  </div>
+                        {selectedContract.sitePhotos.length > 3 && (
+                          <Button 
+                            variant="outline" 
+                            className="w-full"
+                            onClick={() => {
+                              setSelectedContract(selectedContract);
+                              setIsSitePhotosOpen(true);
+                            }}
+                          >
+                            <Camera className="h-4 w-4 mr-2" />
+                            {t({ en: `View All ${selectedContract.sitePhotos.length} Photos`, mr: `सर्व ${selectedContract.sitePhotos.length} फोटो पहा` })}
+                          </Button>
+                        )}
                       </div>
-                      <div>
-                        <h5 className="font-semibold">{t({ en: 'Expected Completion', mr: 'अपेक्षित पूर्णता' })}</h5>
-                        <p>{formatDate(selectedContract.expectedCompletion)}</p>
+                    ) : (
+                      <p className="text-gray-500 italic text-center py-8">{t({ en: 'No site photos available', mr: 'साइट फोटो उपलब्ध नाहीत' })}</p>
+                    )}
+                </div>
+
+                  {/* Quick Stats */}
+                  <div className="bg-white p-6 rounded-lg shadow-sm border">
+                    <h4 className="font-bold text-lg mb-4 text-gray-800 flex items-center gap-2">
+                      <BarChart3 className="h-5 w-5" />
+                      {t({ en: 'Quick Stats', mr: 'त्वरित आकडेवारी' })}
+                    </h4>
+                  <div className="space-y-4">
+                      <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-blue-600" />
+                            <span className="text-gray-700 font-medium">{t({ en: 'Days Remaining', mr: 'दिवस शिल्लक' })}</span>
+                    </div>
+                          <span className="text-2xl font-bold text-blue-600">
+                            {selectedContract.expectedCompletionDate ? 
+                              Math.max(0, Math.ceil((new Date(selectedContract.expectedCompletionDate) - new Date()) / (1000 * 60 * 60 * 24))) : 
+                              'N/A'
+                            }
+                          </span>
+                    </div>
+                      </div>
+                      
+                      <div className="bg-gradient-to-r from-green-50 to-green-100 p-4 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                            <span className="text-gray-700 font-medium">{t({ en: 'Budget Used', mr: 'वापरलेले बजेट' })}</span>
+                          </div>
+                          <span className="text-xl font-bold text-green-600">
+                            {formatCurrency((selectedContract.allocatedBudget * selectedContract.progress) / 100)}
+                          </span>
                       </div>
                     </div>
                     
-                    <div>
-                      <h5 className="font-semibold mb-2">{t({ en: 'Latest Site Photo', mr: 'नवीनतम साइट फोटो' })}</h5>
-                      <ImageWithFallback
-                        src={selectedContract.sitePhoto}
-                        alt={t(selectedContract.title)}
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
+                      <div className="bg-gradient-to-r from-orange-50 to-orange-100 p-4 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <Wallet className="h-4 w-4 text-orange-600" />
+                            <span className="text-gray-700 font-medium">{t({ en: 'Budget Remaining', mr: 'बजेट शिल्लक' })}</span>
+                    </div>
+                          <span className="text-xl font-bold text-orange-600">
+                            {formatCurrency((selectedContract.allocatedBudget * (100 - selectedContract.progress)) / 100)}
+                          </span>
+                  </div>
+                </div>
+
+                      {/* Budget Variance */}
+                      <div className="bg-gradient-to-r from-purple-50 to-purple-100 p-4 rounded-lg">
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            <DollarSign className="h-4 w-4 text-purple-600" />
+                            <span className="text-gray-700 font-medium">{t({ en: 'Budget Variance', mr: 'बजेट फरक' })}</span>
+                          </div>
+                          <span className={`text-xl font-bold ${selectedContract.allocatedBudget > selectedContract.estimatedBudget ? 'text-green-600' : selectedContract.allocatedBudget < selectedContract.estimatedBudget ? 'text-red-600' : 'text-gray-600'}`}>
+                            {selectedContract.allocatedBudget > selectedContract.estimatedBudget ? '+' : ''}
+                            {formatCurrency(selectedContract.allocatedBudget - selectedContract.estimatedBudget)}
+                          </span>
+                        </div>
+                        <div className="text-xs text-gray-500 mt-1">
+                          {t({ en: 'vs Original Budget', mr: 'मूळ बजेटच्या तुलनेत' })}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -847,7 +875,7 @@ export function ContractsPage() {
             </div>
           )}
 
-          <div className="flex justify-end gap-2 pt-4">
+          <div className="flex justify-end gap-2 pt-4 border-t">
             <Button variant="outline" onClick={() => setIsProgressOpen(false)}>
               {t({ en: 'Close', mr: 'बंद करा' })}
             </Button>
@@ -879,7 +907,7 @@ export function ContractsPage() {
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <ImageWithFallback
-                    src={selectedContract.finalPhoto}
+                    src={selectedContract.finalPhotos?.[0] || selectedContract.finalPhoto}
                     alt={t(selectedContract.title)}
                     className="w-full h-64 object-cover rounded-lg mb-4"
                   />
@@ -912,7 +940,7 @@ export function ContractsPage() {
                   <div>
                     <h4 className="font-bold mb-3">{t({ en: 'Project Deliverables', mr: 'प्रकल्प वितरण' })}</h4>
                     <div className="space-y-2">
-                      {selectedContract.deliverables.map((item, index) => (
+                      {selectedContract.deliverables?.map((item, index) => (
                         <div key={index} className="flex justify-between items-center bg-gray-50 p-3 rounded-lg">
                           <span className="font-medium">{t(item.item)}</span>
                           <span className="text-blue-600 font-bold">{item.value}</span>
@@ -922,10 +950,22 @@ export function ContractsPage() {
                   </div>
                   
                   <div>
-                    <Button className="w-full bg-blue-500 hover:bg-blue-600 text-white">
+                    {selectedContract.completionReportUrl ? (
+                      <Button 
+                        className="w-full bg-blue-500 hover:bg-blue-600 text-white"
+                        onClick={() => {
+                          const link = document.createElement('a');
+                          link.href = selectedContract.completionReportUrl;
+                          link.target = '_blank';
+                          link.click();
+                        }}
+                      >
                       <Download className="h-4 w-4 mr-2" />
                       {t({ en: 'Download Full Report', mr: 'संपूर्ण अहवाल डाउनलोड करा' })}
                     </Button>
+                    ) : (
+                      <p className="text-gray-500 text-center">{t({ en: 'No completion report available', mr: 'पूर्णता अहवाल उपलब्ध नाही' })}</p>
+                    )}
                   </div>
                 </div>
               </div>
@@ -934,6 +974,68 @@ export function ContractsPage() {
 
           <div className="flex justify-end gap-2 pt-4">
             <Button variant="outline" onClick={() => setIsReportOpen(false)}>
+              {t({ en: 'Close', mr: 'बंद करा' })}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Site Photos Modal */}
+      <Dialog open={isSitePhotosOpen} onOpenChange={setIsSitePhotosOpen}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold">{t({ en: 'Site Photos', mr: 'साइट फोटो' })}</DialogTitle>
+          </DialogHeader>
+
+          {selectedContract && selectedContract.sitePhotos && (
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg">
+                <h3 className="text-xl font-bold text-gray-900">{t(selectedContract.title)}</h3>
+                <p className="text-gray-600">{t({ en: `${selectedContract.sitePhotos.length} photos available`, mr: `${selectedContract.sitePhotos.length} फोटो उपलब्ध` })}</p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {selectedContract.sitePhotos.map((photo, index) => (
+                  <div key={index} className="group relative">
+                    <ImageWithFallback
+                      src={photo}
+                      alt={`${t(selectedContract.title)} - Photo ${index + 1}`}
+                      className="w-full h-64 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                      onClick={() => {
+                        // Open full screen view
+                        window.open(photo, '_blank');
+                      }}
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-20 transition-all duration-300 rounded-lg flex items-center justify-center">
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <Button 
+                          variant="secondary" 
+                          size="sm"
+                          onClick={() => window.open(photo, '_blank')}
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          {t({ en: 'View Full Size', mr: 'पूर्ण आकार पहा' })}
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="mt-2 text-center">
+                      <span className="text-sm text-gray-500">{t({ en: `Photo ${index + 1}`, mr: `फोटो ${index + 1}` })}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {selectedContract.sitePhotos.length === 0 && (
+                <div className="text-center py-12">
+                  <Camera className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500 text-lg">{t({ en: 'No site photos available', mr: 'साइट फोटो उपलब्ध नाहीत' })}</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-4 border-t">
+            <Button variant="outline" onClick={() => setIsSitePhotosOpen(false)}>
               {t({ en: 'Close', mr: 'बंद करा' })}
             </Button>
           </div>

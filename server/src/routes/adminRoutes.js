@@ -114,6 +114,16 @@ const {
   adminToggleFeaturedStatus
 } = require('../controllers/latestDevelopmentController');
 
+// Import Project Admin controllers
+const {
+  createProject,
+  getAllProjects,
+  getProjectById,
+  updateProject,
+  deleteProject,
+  getProjectStats
+} = require('../controllers/projectAdminController');
+
 // Import multer for file uploads
 const multer = require('multer');
 const storage = multer.memoryStorage();
@@ -550,6 +560,38 @@ router.patch('/latest-developments/:id/toggle-status', protect, admin, adminTogg
 // @desc    Admin: Toggle featured status
 // @access  Private/Admin
 router.patch('/latest-developments/:id/toggle-featured', protect, admin, adminToggleFeaturedStatus);
+
+// ==================== PROJECT MANAGEMENT ROUTES ====================
+
+// @route   GET /api/admin/projects
+// @desc    Admin: Get all projects with optional status filtering
+// @access  Private/Admin
+router.get('/projects', protect, admin, getAllProjects);
+
+// @route   GET /api/admin/projects/stats
+// @desc    Admin: Get project statistics for dashboard
+// @access  Private/Admin
+router.get('/projects/stats', protect, admin, getProjectStats);
+
+// @route   POST /api/admin/projects
+// @desc    Admin: Create new project
+// @access  Private/Admin
+router.post('/projects', protect, admin, createProject);
+
+// @route   GET /api/admin/projects/:id
+// @desc    Admin: Get project by ID
+// @access  Private/Admin
+router.get('/projects/:id', protect, admin, getProjectById);
+
+// @route   PUT /api/admin/projects/:id
+// @desc    Admin: Update project
+// @access  Private/Admin
+router.put('/projects/:id', protect, admin, updateProject);
+
+// @route   DELETE /api/admin/projects/:id
+// @desc    Admin: Delete project
+// @access  Private/Admin
+router.delete('/projects/:id', protect, admin, deleteProject);
 
 module.exports = router;
 
