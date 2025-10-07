@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tax Payment Receipt</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Arial', sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background-color: #fff;
+        }
+        
+        .receipt-container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px;
+            background: #fff;
+        }
+        
+        .header {
+            text-align: center;
+            border-bottom: 3px solid #2c5aa0;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #2c5aa0;
+            font-size: 28px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+        
+        .header h2 {
+            color: #666;
+            font-size: 18px;
+            font-weight: normal;
+        }
+        
+        .receipt-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        
+        .receipt-details {
+            flex: 1;
+        }
+        
+        .receipt-details h3 {
+            color: #2c5aa0;
+            font-size: 20px;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 5px;
+        }
+        
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            padding: 5px 0;
+        }
+        
+        .info-label {
+            font-weight: bold;
+            color: #555;
+            min-width: 120px;
+        }
+        
+        .info-value {
+            color: #333;
+            text-align: right;
+        }
+        
+        .payment-details {
+            background-color: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid #28a745;
+        }
+        
+        .payment-details h3 {
+            color: #28a745;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        
+        .amount-highlight {
+            background-color: #e8f5e8;
+            padding: 15px;
+            border-radius: 6px;
+            text-align: center;
+            margin: 20px 0;
+            border: 2px solid #28a745;
+        }
+        
+        .amount-highlight .amount {
+            font-size: 24px;
+            font-weight: bold;
+            color: #28a745;
+        }
+        
+        .amount-highlight .label {
+            font-size: 14px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .footer {
+            margin-top: 40px;
+            text-align: center;
+            border-top: 2px solid #e0e0e0;
+            padding-top: 20px;
+            color: #666;
+        }
+        
+        .footer p {
+            margin-bottom: 5px;
+        }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: bold;
+            text-transform: uppercase;
+        }
+        
+        .status-paid {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .receipt-number {
+            font-size: 16px;
+            font-weight: bold;
+            color: #2c5aa0;
+            text-align: center;
+            margin: 20px 0;
+            padding: 10px;
+            background-color: #f0f4f8;
+            border-radius: 6px;
+        }
+        
+        @media print {
+            .receipt-container {
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 24px;
+            }
+            
+            .amount-highlight .amount {
+                font-size: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="receipt-container">
+        <!-- Header -->
+        <div class="header">
+            <h1>Gram Panchayat</h1>
+            <h2>Tax Payment Receipt</h2>
+        </div>
+        
+        <!-- Receipt Number -->
+        <div class="receipt-number">
+            Receipt No: <%= record.paymentDetails.receiptNumber %>
+        </div>
+        
+        <!-- Receipt Information -->
+        <div class="receipt-info">
+            <div class="receipt-details">
+                <h3>Taxpayer Information</h3>
+                <div class="info-row">
+                    <span class="info-label">House Number:</span>
+                    <span class="info-value"><%= record.houseNumber %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Owner Name:</span>
+                    <span class="info-value"><%= record.ownerName %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Tax Type:</span>
+                    <span class="info-value"><%= record.taxType %></span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Due Date:</span>
+                    <span class="info-value"><%= new Date(record.dueDate).toLocaleDateString('en-IN') %></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Payment Details -->
+        <div class="payment-details">
+            <h3>Payment Information</h3>
+            <div class="info-row">
+                <span class="info-label">Payment Date:</span>
+                <span class="info-value"><%= new Date(record.paymentDetails.paymentDate).toLocaleDateString('en-IN') %></span>
+            </div>
+            <% if (record.paymentDetails.orderId) { %>
+            <div class="info-row">
+                <span class="info-label">Order ID:</span>
+                <span class="info-value"><%= record.paymentDetails.orderId %></span>
+            </div>
+            <% } %>
+            <% if (record.paymentDetails.paymentId) { %>
+            <div class="info-row">
+                <span class="info-label">Payment ID:</span>
+                <span class="info-value"><%= record.paymentDetails.paymentId %></span>
+            </div>
+            <% } %>
+            <div class="info-row">
+                <span class="info-label">Status:</span>
+                <span class="info-value">
+                    <span class="status-badge status-paid">Paid</span>
+                </span>
+            </div>
+        </div>
+        
+        <!-- Amount Highlight -->
+        <div class="amount-highlight">
+            <div class="amount">₹<%= record.amountDue.toLocaleString('en-IN') %></div>
+            <div class="label">Amount Paid</div>
+        </div>
+        
+        <!-- Footer -->
+        <div class="footer">
+            <p><strong>Thank you for your payment!</strong></p>
+            <p>This is an official receipt for your tax payment.</p>
+            <p>Please keep this receipt for your records.</p>
+            <p style="margin-top: 15px; font-size: 12px;">
+                Generated on: <%= new Date().toLocaleDateString('en-IN') %> at <%= new Date().toLocaleTimeString('en-IN') %>
+            </p>
+        </div>
+    </div>
+</body>
+</html>

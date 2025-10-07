@@ -124,8 +124,28 @@ const {
   getProjectStats
 } = require('../controllers/projectAdminController');
 
+// Import Tax Admin controllers
+const {
+  uploadTaxRecordsCsv,
+  createTaxRecord,
+  getAllTaxRecords,
+  updateTaxRecord,
+  deleteTaxRecord,
+  markAsPaid
+} = require('../controllers/taxAdminController');
+
 // Import multer for file uploads
 const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = './uploads';
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
+
+// Multer configuration for images
 const storage = multer.memoryStorage();
 const upload = multer({
   storage: storage,
@@ -142,6 +162,33 @@ const upload = multer({
       return cb(null, true);
     } else {
       cb(new Error('Only image files are allowed!'));
+    }
+  }
+});
+
+// Multer configuration for CSV files
+const csvStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadsDir);
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'tax-records-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const csvUpload = multer({
+  storage: csvStorage,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB limit for CSV files
+  },
+  fileFilter: (req, file, cb) => {
+    // Check if file is CSV
+    if (file.mimetype === 'text/csv' || path.extname(file.originalname).toLowerCase() === '.csv') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only CSV files are allowed!'));
     }
   }
 });
@@ -592,6 +639,38 @@ router.put('/projects/:id', protect, admin, updateProject);
 // @desc    Admin: Delete project
 // @access  Private/Admin
 router.delete('/projects/:id', protect, admin, deleteProject);
+
+// ==================== TAX MANAGEMENT ROUTES ====================
+
+// @route   POST /api/admin/taxes
+// @desc    Admin: Create a new tax record
+// @access  Private/Admin
+router.post('/taxes', protect, admin, createTaxRecord);
+
+// @route   GET /api/admin/taxes
+// @desc    Admin: Get all tax records with filtering and search
+// @access  Private/Admin
+router.get('/taxes', protect, admin, getAllTaxRecords);
+
+// @route   PUT /api/admin/taxes/:id
+// @desc    Admin: Update a tax record
+// @access  Private/Admin
+router.put('/taxes/:id', protect, admin, updateTaxRecord);
+
+// @route   DELETE /api/admin/taxes/:id
+// @desc    Admin: Delete a tax record
+// @access  Private/Admin
+router.delete('/taxes/:id', protect, admin, deleteTaxRecord);
+
+// @route   PATCH /api/admin/taxes/:id/mark-paid
+// @desc    Admin: Mark tax record as paid (for offline payments)
+// @access  Private/Admin
+router.patch('/taxes/:id/mark-paid', protect, admin, markAsPaid);
+
+// @route   POST /api/admin/taxes/upload
+// @desc    Admin: Upload tax records via CSV file
+// @access  Private/Admin
+router.post('/taxes/upload', protect, admin, csvUpload.single('file'), uploadTaxRecordsCsv);
 
 module.exports = router;
 

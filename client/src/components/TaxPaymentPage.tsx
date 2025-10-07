@@ -7,7 +7,8 @@ import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { useLanguage } from './LanguageProvider';
 import { useAuth } from './AuthContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
+import { searchTaxRecords, createPaymentOrder, verifyPayment, downloadReceipt } from '../services/taxService';
 import { 
   CreditCard, 
   AlertCircle, 
@@ -50,7 +51,9 @@ export function TaxPaymentPage() {
   const [selectedTaxType, setSelectedTaxType] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<TaxRecord[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  const [paymentSuccessRecord, setPaymentSuccessRecord] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedTaxForPayment, setSelectedTaxForPayment] = useState<TaxRecord | null>(null);
@@ -119,7 +122,7 @@ export function TaxPaymentPage() {
     }
   ];
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!isLoggedIn) {
       toast.error(t({ 
         en: 'Please login to search tax records', 
@@ -136,23 +139,182 @@ export function TaxPaymentPage() {
       return;
     }
 
-    const results = taxDatabase.filter(record => 
-      record.ownerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      record.houseNumber === searchQuery.trim()
-    );
-
-    setSearchResults(results);
-    setHasSearched(true);
-
-    if (results.length === 0) {
-      toast.error(t({ 
-        en: 'No tax records found for the given criteria', 
-        mr: 'दिलेल्या निकषानुसार कोणतेही कर रेकॉर्ड सापडले नाहीत' 
+    try {
+      setIsLoading(true);
+      setHasSearched(true);
+      
+      const response = await searchTaxRecords(searchQuery.trim());
+      
+      // Transform the API response to match the expected TaxRecord interface
+      const transformedResults = response.data.map((record: any) => ({
+        id: record._id,
+        ownerName: record.ownerName,
+        houseNumber: record.houseNumber,
+        type: record.taxType.toLowerCase().includes('property') ? 'property' as const : 'water' as const,
+        amount: record.amountDue,
+        dueDate: record.dueDate,
+        status: record.status.toLowerCase() as 'pending' | 'paid' | 'overdue',
+        details: {
+          taxType: record.taxType,
+          receiptNumber: record.paymentDetails?.receiptNumber || null
+        }
       }));
-    } else {
+
+      setSearchResults(transformedResults);
+
+      if (transformedResults.length === 0) {
+        toast.info(t({ 
+          en: 'No pending tax records found for the given criteria', 
+          mr: 'दिलेल्या निकषानुसार कोणतेही प्रलंबित कर रेकॉर्ड सापडले नाहीत' 
+        }));
+      } else {
+        toast.success(t({ 
+          en: `Found ${transformedResults.length} tax record(s)`, 
+          mr: `${transformedResults.length} कर रेकॉर्ड सापडले` 
+        }));
+      }
+    } catch (error) {
+      console.error('Error searching tax records:', error);
+      toast.error(t({ 
+        en: 'Failed to search tax records. Please try again.', 
+        mr: 'कर रेकॉर्ड शोधण्यात अयशस्वी. कृपया पुन्हा प्रयत्न करा.' 
+      }));
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handlePayment = async (record) => {
+    if (!isLoggedIn) {
+      toast.error(t({ 
+        en: 'Please login to make payments', 
+        mr: 'पेमेंट करण्यासाठी कृपया लॉगिन करा' 
+      }));
+      return;
+    }
+
+    try {
+      console.log('[Payment] Record data:', record);
+      console.log('[Payment] Record ID:', record.id);
+      
+      // Validate record ID
+      if (!record.id) {
+        toast.error(t({ 
+          en: 'Invalid tax record. Please try searching again.', 
+          mr: 'अवैध कर रेकॉर्ड. कृपया पुन्हा शोधा.' 
+        }));
+        return;
+      }
+      
+      console.log('[Payment] Sending request with taxRecordId:', record.id);
+      const order = await createPaymentOrder({ taxRecordId: record.id });
+      
+      // Check if this is a development order (starts with 'dev_order_')
+      const isDevelopmentOrder = order.data.orderId.startsWith('dev_order_');
+      
+      if (isDevelopmentOrder) {
+        // Simulate payment success for development
+        console.log('[Payment] Development mode - simulating payment success');
+        toast.success(t({ 
+          en: 'Payment simulated successfully (Development Mode)', 
+          mr: 'पेमेंट यशस्वीरित्या सिम्युलेट केले (डेव्हलपमेंट मोड)' 
+        }));
+        
+        // Simulate payment verification
+        try {
+          await verifyPayment({
+            razorpay_order_id: order.data.orderId,
+            razorpay_payment_id: 'dev_payment_' + Date.now(),
+            razorpay_signature: 'dev_signature_' + Date.now(),
+            taxRecordId: record.id
+          });
+          
+          setPaymentSuccessRecord(record);
+          handleSearch();
+        } catch (err) {
+          console.error("Simulated payment verification failed:", err);
+        }
+        return;
+      }
+      
+      // Real Razorpay payment flow
+      const options = {
+        key: order.data.key,
+        amount: order.data.amount,
+        currency: "INR",
+        name: "Digital Village Tax Payment",
+        description: `Payment for ${record.details.taxType}`,
+        order_id: order.data.orderId,
+        handler: async (response) => {
+          try {
+            await verifyPayment({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature,
+              taxRecordId: record.id
+            });
+            // On success, show the success message and download button
+            setPaymentSuccessRecord(record);
+            handleSearch(); // Refresh the list of dues
+            toast.success(t({ 
+              en: 'Payment Successful!', 
+              mr: 'पेमेंट यशस्वी!' 
+            }));
+          } catch (err) {
+            console.error("Payment verification failed:", err);
+            toast.error(t({ 
+              en: 'Payment successful, but verification failed. Please contact support.', 
+              mr: 'पेमेंट यशस्वी, परंतु सत्यापन अयशस्वी. कृपया सपोर्टशी संपर्क साधा.' 
+            }));
+          }
+        },
+        prefill: {
+          name: record.ownerName,
+        },
+        theme: {
+          color: "#dc2626" // Tax color theme
+        },
+        modal: {
+          ondismiss: () => {
+            toast.info(t({ 
+              en: 'Payment cancelled', 
+              mr: 'पेमेंट रद्द झाले' 
+            }));
+          }
+        }
+      };
+      
+      console.log("RAZORPAY OPTIONS BEING SENT:", options);
+      const paymentObject = new (window as any).Razorpay(options);
+      paymentObject.open();
+    } catch (error) {
+      console.error("Error creating payment order:", error);
+      toast.error(t({ 
+        en: 'Failed to initiate payment. Please try again.', 
+        mr: 'पेमेंट सुरू करण्यात अयशस्वी. कृपया पुन्हा प्रयत्न करा.' 
+      }));
+    }
+  };
+
+  const handleDownloadReceipt = async (recordId) => {
+    try {
+      const response = await downloadReceipt(recordId);
+      // Create a Blob from the PDF stream
+      const file = new Blob([response.data], { type: 'application/pdf' });
+      // Build a URL from the file
+      const fileURL = URL.createObjectURL(file);
+      // Open the URL on new Window
+      window.open(fileURL);
       toast.success(t({ 
-        en: `Found ${results.length} tax record(s)`, 
-        mr: `${results.length} कर रेकॉर्ड सापडले` 
+        en: 'Receipt downloaded successfully!', 
+        mr: 'रसीद यशस्वीरित्या डाउनलोड झाली!' 
+      }));
+    } catch (error) {
+      console.error("Failed to download receipt:", error);
+      toast.error(t({ 
+        en: 'Failed to download receipt. Please try again.', 
+        mr: 'रसीद डाउनलोड करण्यात अयशस्वी. कृपया पुन्हा प्रयत्न करा.' 
       }));
     }
   };
@@ -343,10 +505,15 @@ export function TaxPaymentPage() {
                   </div>
                   <Button 
                     onClick={handleSearch}
-                    className="bg-gradient-to-r from-tax-color to-red-600 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300"
+                    disabled={isLoading}
+                    className="bg-gradient-to-r from-tax-color to-red-600 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300 disabled:opacity-50"
                   >
-                    <Search className="h-4 w-4 mr-2" />
-                    {t({ en: 'Search', mr: 'शोधा' })}
+                    {isLoading ? (
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    ) : (
+                      <Search className="h-4 w-4 mr-2" />
+                    )}
+                    {isLoading ? t({ en: 'Searching...', mr: 'शोधत आहे...' }) : t({ en: 'Search', mr: 'शोधा' })}
                   </Button>
                 </div>
               </CardContent>
@@ -380,6 +547,143 @@ export function TaxPaymentPage() {
                       </Button>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Payment Success Message */}
+            {paymentSuccessRecord && (
+              <Card className="glass-card border-0 shadow-xl animate-fade-in-up bg-green-50 border-green-200" style={{ animationDelay: '0.3s' }}>
+                <CardContent className="p-6 text-center">
+                  <div className="w-16 h-16 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <CheckCircle className="h-8 w-8 text-white" />
+                  </div>
+                  <h3 className="font-bold text-lg text-green-800 mb-2">
+                    {t({ en: 'Payment Successful!', mr: 'पेमेंट यशस्वी!' })}
+                  </h3>
+                  <p className="text-green-700 mb-4">
+                    {t({ en: 'Your payment for', mr: 'तुमचे पेमेंट' })} {paymentSuccessRecord.details.taxType} {t({ en: 'has been received.', mr: 'यशस्वीरित्या प्राप्त झाले.' })}
+                  </p>
+                  <Button 
+                    onClick={() => handleDownloadReceipt(paymentSuccessRecord.id)} 
+                    className="bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <Download className="h-4 w-4 mr-2" />
+                    {t({ en: 'Download Receipt', mr: 'रसीद डाउनलोड करा' })}
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => setPaymentSuccessRecord(null)}
+                    className="ml-3"
+                  >
+                    {t({ en: 'Close', mr: 'बंद करा' })}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Search Results */}
+            {hasSearched && (
+              <Card className="glass-card border-0 shadow-xl animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
+                <CardHeader>
+                  <CardTitle className="text-tax flex items-center gap-2">
+                    <Search className="h-5 w-5" />
+                    {t({ en: 'Search Results', mr: 'शोध परिणाम' })}
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {isLoading ? (
+                    <div className="text-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tax mx-auto mb-4"></div>
+                      <p className="text-gray-600">
+                        {t({ en: 'Searching tax records...', mr: 'कर रेकॉर्ड शोधत आहे...' })}
+                      </p>
+                    </div>
+                  ) : searchResults.length === 0 ? (
+                    <div className="text-center py-8">
+                      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <Search className="h-8 w-8 text-gray-400" />
+                      </div>
+                      <h3 className="text-gray-700 mb-2 font-semibold">
+                        {t({ en: 'No Pending Tax Records Found', mr: 'कोणतेही प्रलंबित कर रेकॉर्ड सापडले नाही' })}
+                      </h3>
+                      <p className="text-gray-600">
+                        {t({ 
+                          en: 'No pending or overdue tax records found for your search criteria. All your taxes might be paid up!', 
+                          mr: 'तुमच्या शोध निकषानुसार कोणतेही प्रलंबित किंवा ओव्हरड्यू कर रेकॉर्ड सापडले नाही. तुमचे सर्व कर भरले असू शकतात!' 
+                        })}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {searchResults.map((record) => (
+                        <div key={record.id} className="glass-effect p-4 rounded-lg border border-gray-200 hover:border-tax/30 transition-all duration-300">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 bg-gradient-to-br from-tax-color to-red-600 rounded-full flex items-center justify-center">
+                                  <User className="h-5 w-5 text-white" />
+                                </div>
+                                <div>
+                                  <h4 className="font-semibold text-gray-800">{record.ownerName}</h4>
+                                  <p className="text-sm text-gray-600">
+                                    {t({ en: 'House Number:', mr: 'घर क्रमांक:' })} {record.houseNumber}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="grid md:grid-cols-3 gap-4 text-sm">
+                                <div>
+                                  <span className="text-gray-600">{t({ en: 'Tax Type:', mr: 'कर प्रकार:' })}</span>
+                                  <p className="font-medium">{record.details.taxType}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">{t({ en: 'Amount Due:', mr: 'देय रक्कम:' })}</span>
+                                  <p className="font-bold text-tax">₹{record.amount.toLocaleString('en-IN')}</p>
+                                </div>
+                                <div>
+                                  <span className="text-gray-600">{t({ en: 'Due Date:', mr: 'देय तारीख:' })}</span>
+                                  <p className="font-medium">{new Date(record.dueDate).toLocaleDateString('en-IN')}</p>
+                                </div>
+                              </div>
+                              <div className="mt-3">
+                                <Badge 
+                                  variant={record.status === 'paid' ? 'default' : record.status === 'overdue' ? 'destructive' : 'secondary'}
+                                  className="text-xs"
+                                >
+                                  {record.status === 'paid' ? t({ en: 'Paid', mr: 'पैसे दिले' }) :
+                                   record.status === 'overdue' ? t({ en: 'Overdue', mr: 'ओव्हरड्यू' }) :
+                                   t({ en: 'Pending', mr: 'प्रलंबित' })}
+                                </Badge>
+                              </div>
+                            </div>
+                            {record.status !== 'paid' && (
+                              <div className="ml-4">
+                                <Button
+                                  onClick={() => handlePayment(record)}
+                                  className="bg-gradient-to-r from-tax-color to-red-600 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300"
+                                >
+                                  <CreditCard className="h-4 w-4 mr-2" />
+                                  {t({ en: 'Pay Now', mr: 'आत्ता पैसे द्या' })}
+                                </Button>
+                              </div>
+                            )}
+                            {record.status === 'paid' && (
+                              <div className="ml-4">
+                                <Button
+                                  onClick={() => handleDownloadReceipt(record.id)}
+                                  variant="outline"
+                                  className="border-tax text-tax hover:bg-tax hover:text-white transition-all duration-300"
+                                >
+                                  <Download className="h-4 w-4 mr-2" />
+                                  {t({ en: 'Download Receipt', mr: 'रसीद डाउनलोड करा' })}
+                                </Button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             )}

@@ -12,7 +12,7 @@ import { MediaPage } from './components/MediaPage';
 import { NewsPage } from './components/NewsPage';
 import { ContractsPage } from './components/ContractsPage';
 import { AuthenticationPage } from './components/AuthenticationPage';
-import { AdminPage } from './components/AdminPage';
+import AdminPage from './components/AdminPage';
 import { AdminContractsPage } from './components/AdminContractsPage';
 import { AdminLoginPage } from './components/AdminLoginPage';
 import { AdminFloatingContractsButton } from './components/AdminFloatingContractsButton';
