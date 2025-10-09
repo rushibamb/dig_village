@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { useLanguage } from './LanguageProvider';
 import { getPublicFacilities, getPublicAchievements, getPublicSiteSettings, getPublicLatestDevelopments } from '../services/homeContentService';
 import { getPublicOfficeInfo } from '../services/committeeService';
+import { getVillagerStats } from '../services/villagerService';
 import { 
   MapPin,
   Users,
@@ -32,7 +34,9 @@ export function VillageLandingPage() {
   const [achievements, setAchievements] = useState([]);
   const [latestDevelopments, setLatestDevelopments] = useState([]);
   const [contactInfo, setContactInfo] = useState(null);
+  const [villagerStats, setVillagerStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedNews, setSelectedNews] = useState(null);
 
   // Fetch all data concurrently
   useEffect(() => {
@@ -41,12 +45,13 @@ export function VillageLandingPage() {
         setLoading(true);
         
         // Fetch all data concurrently for better performance
-        const [siteSettings, facilitiesData, achievementsData, latestDevelopmentsData, officeInfo] = await Promise.all([
+        const [siteSettings, facilitiesData, achievementsData, latestDevelopmentsData, officeInfo, villagerStatsData] = await Promise.all([
           getPublicSiteSettings(),
           getPublicFacilities(),
           getPublicAchievements(),
           getPublicLatestDevelopments({ limit: 3 }),
-          getPublicOfficeInfo()
+          getPublicOfficeInfo(),
+          getVillagerStats()
         ]);
 
         // Update state with fetched data
@@ -55,6 +60,7 @@ export function VillageLandingPage() {
         setAchievements(achievementsData.data || achievementsData || []);
         setLatestDevelopments(latestDevelopmentsData.data || latestDevelopmentsData || []);
         setContactInfo(officeInfo.data || officeInfo);
+        setVillagerStats(villagerStatsData.data || villagerStatsData);
       } catch (error) {
         console.error('Error fetching data:', error);
         // Set fallback data to prevent empty page
@@ -119,12 +125,12 @@ export function VillageLandingPage() {
 
   // Default gradients for facilities
   const gradients = [
-    'from-blue-500 to-indigo-600',
-    'from-red-500 to-pink-600',
-    'from-yellow-500 to-orange-600',
-    'from-cyan-500 to-blue-600',
-    'from-purple-500 to-violet-600',
-    'from-green-500 to-emerald-600'
+    'from-blue-400 to-blue-600',
+    'from-blue-300 to-blue-500',
+    'from-blue-500 to-blue-700',
+    'from-sky-400 to-blue-600',
+    'from-blue-400 to-indigo-500',
+    'from-blue-200 to-blue-400'
   ];
 
   return (
@@ -138,7 +144,7 @@ export function VillageLandingPage() {
 
         <div className="h-[600px] relative">
           <ImageWithFallback
-            src={homeContent?.heroImageUrl || "https://images.unsplash.com/photo-1655974239313-5ab1747a002e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwYmVhdXRiZnVsJTIwbGFuZHNjYXBlfGVufDF8fHx8MTc1NTQ1MzI4MXww&ixlib=rb-4.1.0&q=80&w=1080"}
+            src={homeContent?.heroImageUrl || "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZ3JlZW4lMjBmaWVsZHN8ZW58MXx8fHwxNzU1NDUzMjgxfDA&ixlib=rb-4.1.0&q=80&w=1080"}
             alt="Village landscape"
             className="w-full h-full object-cover transition-transform duration-1000 hover:scale-105"
           />
@@ -146,17 +152,26 @@ export function VillageLandingPage() {
           
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-white max-w-5xl mx-auto px-6">
-              <div className="animate-fade-in-up">
-                <h1 className="text-5xl md:text-7xl font-bold mb-6 gradient-text-primary">
-                  {loading ? 
-                    t({ en: 'Welcome to Rampur Village', mr: 'रामपूर गावात आपले स्वागत आहे' }) :
-                    t(homeContent?.heroTitle) || t({ en: 'Welcome to Rampur Village', mr: 'रामपूर गावात आपले स्वागत आहे' })
-                  }
-                </h1>
-              </div>
+            <div className="animate-fade-in-up">
+    {/* - Increased font sizes for larger screens (e.g., 2xl:text-[32rem]).
+      - A vibrant blue-to-purple-to-pink gradient for more visual impact.
+      - A slightly stronger custom drop-shadow to make the text stand out more.
+      - `tracking-tighter` to make the large letters sit closer together.
+    */}
+    <h1 className="text-[16rem] md:text-[18rem] lg:text-[28rem] xl:text-[28rem] 2xl:text-[38rem] font-black mb-8 
+                   bg-gradient-to-r from-blue-600 via-purple-500 to-pink-500 
+                   bg-clip-text text-transparent 
+                   drop-shadow-[0_4px_8px_rgba(0,0,0,0.2)] 
+                   leading-none tracking-tighter font-serif">
+        {loading ? 
+            t({ en: 'Welcome to Rampur Village', mr: 'रामपूर गावात आपले स्वागत आहे' }) :
+            t(homeContent?.heroTitle) || t({ en: 'Welcome to Rampur Village', mr: 'रामपूर गावात आपले स्वागत आहे' })
+        }
+    </h1>
+</div>
               
               <div className="animate-slide-in-right" style={{ animationDelay: '0.3s' }}>
-                <p className="text-xl md:text-2xl mb-10 opacity-95 leading-relaxed">
+                <p className="text-xl md:text-2xl lg:text-3xl mb-12 text-white/98 leading-relaxed font-medium drop-shadow-xl max-w-4xl mx-auto">
                   {loading ?
                     t({ 
                       en: 'A progressive smart village embracing technology for sustainable living and digital governance',
@@ -199,7 +214,10 @@ export function VillageLandingPage() {
           
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             {villageStatsConfig.map((statConfig, index) => {
-              const value = homeContent?.villageStats?.[statConfig.key] || '-';
+              // Use dynamic villager stats for population, fallback to static for other stats
+              const value = statConfig.key === 'population' 
+                ? (villagerStats?.total || homeContent?.villageStats?.[statConfig.key] || '-')
+                : (homeContent?.villageStats?.[statConfig.key] || '-');
               return (
                 <Card key={index} 
                       className={`text-center border-0 shadow-xl hover-lift glass-effect group animate-scale-in`}
@@ -259,7 +277,7 @@ export function VillageLandingPage() {
             <div className="relative animate-slide-in-right">
               <div className="glass-effect p-6 rounded-3xl hover-lift shadow-2xl">
                 <ImageWithFallback
-                  src={homeContent?.aboutImageUrl || "https://images.unsplash.com/photo-1695981103111-89f89e9755a9?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHx2aWxsYWdlJTIwdGVtcGxlJTIwYXJjaGl0ZWN0dXJlJTIwaW5kaWF8ZW58MXx8fHwxNzU1NDUzMjg5fDA&ixlib=rb-4.1.0&q=80&w=1080"}
+                  src={homeContent?.aboutImageUrl || "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZ3JlZW4lMjBmaWVsZHN8ZW58MXx8fHwxNzU1NDUzMjgxfDA&ixlib=rb-4.1.0&q=80&w=1080"}
                   alt="Village temple"
                   className="rounded-2xl w-full h-[450px] object-cover transition-transform duration-700 hover:scale-105"
                 />
@@ -332,11 +350,12 @@ export function VillageLandingPage() {
               
               return (
                 <Card key={development._id || index} 
-                      className={`overflow-hidden border-0 shadow-xl hover-lift glass-effect group animate-slide-in-left`}
-                      style={{ animationDelay: `${0.1 + index * 0.1}s` }}>
+                      className={`overflow-hidden border-0 shadow-xl hover-lift glass-effect group animate-slide-in-left cursor-pointer`}
+                      style={{ animationDelay: `${0.1 + index * 0.1}s` }}
+                      onClick={() => setSelectedNews(development)}>
                   <div className="h-52 overflow-hidden relative">
                     <ImageWithFallback
-                      src={development.imageUrl || "https://images.unsplash.com/photo-1655974239313-5ab1747a002e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwYmVhdXRpZnVsJTIwbGFuZHNjYXBlfGVufDF8fHx8MTc1NTQ1MzI4MXww&ixlib=rb-4.1.0&q=80&w=1080"}
+                      src={development.imageUrl || "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZ3JlZW4lMjBmaWVsZHN8ZW58MXx8fHwxNzU1NDUzMjgxfDA&ixlib=rb-4.1.0&q=80&w=1080"}
                       alt={t(development.title) || t({ en: 'Latest Development', mr: 'अलीकडील विकास' })}
                       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                     />
@@ -381,9 +400,9 @@ export function VillageLandingPage() {
           {achievements.length > 0 && (
             <div className="mb-16 animate-scale-in">
               <Card className="border-0 shadow-2xl overflow-hidden glass-effect hover-lift group">
-                <div className="bg-gradient-to-r from-yellow-400/10 via-orange-500/10 to-red-500/10 p-8">
+                <div className="bg-gradient-to-r from-blue-100/20 via-blue-200/20 to-blue-300/20 p-8">
                   <div className="flex flex-col lg:flex-row items-center gap-8">
-                    <div className="w-32 h-32 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-2xl animate-glow group-hover:scale-110 transition-transform duration-500">
+                    <div className="w-32 h-32 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center shadow-2xl animate-glow group-hover:scale-110 transition-transform duration-500">
                       <Award className="h-16 w-16 text-white animate-pulse-slow" />
                     </div>
                     <div className="flex-1 text-center lg:text-left">
@@ -393,7 +412,7 @@ export function VillageLandingPage() {
                       <p className="text-lg mb-6 text-gray-700 leading-relaxed">
                         {t(achievements[0].description) || t({ en: 'Outstanding achievement', mr: 'उत्कृष्ट उपलब्धी' })}
                       </p>
-                      <Badge className="bg-gradient-to-r from-yellow-500 to-orange-600 text-white text-base px-6 py-2 shadow-lg">
+                      <Badge className="bg-gradient-to-r from-blue-500 to-blue-700 text-white text-base px-6 py-2 shadow-lg">
                         {t({ en: 'State Level Recognition', mr: 'राज्यस्तरीय मान्यता' })}
                       </Badge>
                     </div>
@@ -490,6 +509,57 @@ export function VillageLandingPage() {
           </div>
         </div>
       </section>
+
+      {/* Latest Developments Modal */}
+      <Dialog open={selectedNews !== null} onOpenChange={() => setSelectedNews(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          {selectedNews && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="text-2xl font-bold mb-2">
+                  {t(selectedNews.title)}
+                </DialogTitle>
+                <DialogDescription className="text-lg text-gray-600">
+                  {t(selectedNews.description)}
+                </DialogDescription>
+              </DialogHeader>
+              
+              <div className="space-y-6">
+                {/* Image */}
+                <div className="w-full h-64 md:h-80 rounded-lg overflow-hidden">
+                  <ImageWithFallback
+                    src={selectedNews.imageUrl || "https://images.unsplash.com/photo-1582213782179-e0d53f98f2ca?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxpbmRpYW4lMjB2aWxsYWdlJTIwZ3JlZW4lMjBmaWVsZHN8ZW58MXx8fHwxNzU1NDUzMjgxfDA&ixlib=rb-4.1.0&q=80&w=1080"}
+                    alt={t(selectedNews.title)}
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                
+                {/* Content */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-4">
+                    <Badge className="bg-gradient-to-r from-blue-500 to-purple-600 text-white">
+                      {t(selectedNews.category)}
+                    </Badge>
+                    <span className="text-sm text-gray-500">
+                      {new Date(selectedNews.publishDate).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'long',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                  
+                  <div className="prose prose-lg max-w-none">
+                    <p className="text-gray-700 leading-relaxed">
+                      {t(selectedNews.description)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -12,38 +12,14 @@ import { MediaPage } from './components/MediaPage';
 import { NewsPage } from './components/NewsPage';
 import { ContractsPage } from './components/ContractsPage';
 import { AuthenticationPage } from './components/AuthenticationPage';
+import { ProfilePage } from './components/ProfilePage';
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage';
 import AdminPage from './components/AdminPage';
-import { AdminContractsPage } from './components/AdminContractsPage';
 import { AdminLoginPage } from './components/AdminLoginPage';
-import { AdminFloatingContractsButton } from './components/AdminFloatingContractsButton';
 import { Toaster } from './components/ui/sonner';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminProtectedRoute from './components/AdminProtectedRoute';
 
-// Dashboard component for protected route
-const DashboardPage = () => {
-  return (
-    <div className="min-h-screen bg-background p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-foreground mb-6">Dashboard</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div className="bg-card p-6 rounded-lg border">
-            <h2 className="text-xl font-semibold mb-2">Welcome to your Dashboard</h2>
-            <p className="text-muted-foreground">This is a protected route that requires authentication.</p>
-          </div>
-          <div className="bg-card p-6 rounded-lg border">
-            <h2 className="text-xl font-semibold mb-2">Your Profile</h2>
-            <p className="text-muted-foreground">Manage your account settings and preferences.</p>
-          </div>
-          <div className="bg-card p-6 rounded-lg border">
-            <h2 className="text-xl font-semibold mb-2">Quick Actions</h2>
-            <p className="text-muted-foreground">Access frequently used features and services.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
 
 export default function App() {
   return (
@@ -62,30 +38,17 @@ export default function App() {
               
               <Route path="/login" element={<AuthenticationPage />} />
               <Route path="/register" element={<AuthenticationPage />} />
+              <Route path="/forgot-password" element={<ForgotPasswordPage />} />
               
               {/* Admin routes */}
               <Route path="/admin" element={<AdminLoginPage />} />
               <Route path="/admin/dashboard" element={
                 <AdminProtectedRoute>
-                  <>
-                    <AdminPage />
-                    <AdminFloatingContractsButton />
-                  </>
+                  <AdminPage />
                 </AdminProtectedRoute>
               } />
               
-              <Route path="/admin/contracts" element={
-                <AdminProtectedRoute>
-                  <AdminContractsPage />
-                </AdminProtectedRoute>
-              } />
               
-              {/* Protected routes for villagers */}
-              <Route path="/dashboard" element={
-                <ProtectedRoute>
-                  <DashboardPage />
-                </ProtectedRoute>
-              } />
               
               {/* Other public routes with navbar */}
               <Route path="/tax" element={
@@ -134,6 +97,13 @@ export default function App() {
                 <ProtectedRoute>
                   <SimpleNavbar />
                   <ContractsPage />
+                </ProtectedRoute>
+              } />
+              
+              <Route path="/profile" element={
+                <ProtectedRoute>
+                  <SimpleNavbar />
+                  <ProfilePage />
                 </ProtectedRoute>
               } />
             </Routes>

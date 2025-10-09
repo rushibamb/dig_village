@@ -8,7 +8,6 @@ import {
   FileText, 
   Users, 
   Newspaper, 
-  ClipboardList,
   MapPin,
   Phone,
   Mail,
@@ -40,13 +39,6 @@ export function HomePage({ onQuickAction }: HomePageProps) {
       description: { en: 'Submit complaints and track their status', mr: 'तक्रारी सबमिट करा आणि त्यांच्या स्थितीचा मागोवा घ्या' },
       action: 'grievance',
       color: 'bg-accent text-accent-foreground'
-    },
-    {
-      icon: ClipboardList,
-      title: t(translations.serviceApplications),
-      description: { en: 'Apply for government services online', mr: 'ऑनलाइन सरकारी सेवांसाठी अर्ज करा' },
-      action: 'services',
-      color: 'bg-primary text-primary-foreground'
     },
     {
       icon: Users,

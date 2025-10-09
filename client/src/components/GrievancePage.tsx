@@ -56,6 +56,7 @@ export function GrievancePage() {
   });
   const [uploadedPhotoUrls, setUploadedPhotoUrls] = useState([]);
   const [stats, setStats] = useState(null);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   // Reusable function to fetch grievances
   const fetchGrievances = async () => {
@@ -319,7 +320,7 @@ export function GrievancePage() {
                     <DialogTrigger asChild>
                       <Button 
                         onClick={handleNewGrievance}
-                        className="bg-white text-purple-600 hover:bg-gray-100"
+                        className="bg-black text-white hover:bg-gray-800"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         {t({ en: 'New Grievance', mr: 'नवीन तक्रार' })}
@@ -341,7 +342,7 @@ export function GrievancePage() {
                 </DialogHeader>
                 
                 <form onSubmit={handleFormSubmit} className="space-y-4">
-                  <div className="grid md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium mb-2">
                         {t({ en: 'Category', mr: 'श्रेणी' })} *
@@ -350,7 +351,7 @@ export function GrievancePage() {
                         name="category"
                         value={newGrievanceData.category}
                         onChange={handleInputChange}
-                        className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-grievance"
+                        className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                         required
                       >
                         <option value="">{t({ en: 'Select Category', mr: 'श्रेणी निवडा' })}</option>
@@ -367,7 +368,7 @@ export function GrievancePage() {
                         name="priority"
                         value={newGrievanceData.priority}
                         onChange={handleInputChange}
-                        className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-grievance"
+                        className="w-full p-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
                       >
                         <option value="Normal">{t({ en: 'Normal', mr: 'सामान्य' })}</option>
                         <option value="High">{t({ en: 'High', mr: 'उच्च' })}</option>
@@ -447,13 +448,14 @@ export function GrievancePage() {
                   </div>
                   
                   <div className="flex gap-3 pt-4">
-                    <Button type="submit" className="bg-gray-800 hover:bg-gray-900 text-white flex-1">
+                    <Button type="submit" className="border-black text-black hover:bg-grey hover:text-black">
                       {t({ en: 'Submit Grievance', mr: 'तक्रार सबमिट करा' })}
                     </Button>
                     <Button 
                       type="button"
                       variant="outline" 
                       onClick={() => setIsModalOpen(false)}
+                      className="border-black text-black hover:bg-black hover:text-grey"
                     >
                       {t({ en: 'Cancel', mr: 'रद्द करा' })}
                     </Button>
@@ -482,7 +484,7 @@ export function GrievancePage() {
                       </p>
                       <Button 
                         onClick={() => window.location.href = '/login'}
-                        className="bg-gray-800 hover:bg-gray-900 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300"
+                        className="bg-black hover:bg-gray-800 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300"
                         size="sm"
                       >
                         <User className="h-4 w-4 mr-2" />
@@ -524,7 +526,14 @@ export function GrievancePage() {
                             </p>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Badge className={getStatusColor(grievance.progressStatus)}>
+                            <Badge 
+                              className={`border ${
+                                grievance.progressStatus === 'Pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                                grievance.progressStatus === 'In-progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                grievance.progressStatus === 'Resolved' ? 'bg-green-100 text-green-800 border-green-200' :
+                                'bg-gray-100 text-gray-800 border-gray-200'
+                              }`}
+                            >
                               {getStatusIcon(grievance.progressStatus)}
                               <span className="ml-1">
                                 {t({ 
@@ -565,6 +574,7 @@ export function GrievancePage() {
                             variant="outline" 
                             size="sm"
                             onClick={() => handleViewDetails(grievance)}
+                            className="border-black text-black hover:bg-black hover:text-white"
                           >
                             {t({ en: 'View Details', mr: 'तपशील पहा' })}
                           </Button>
@@ -635,8 +645,8 @@ export function GrievancePage() {
 
       {/* Grievance Detail Modal */}
       <Dialog open={isDetailModalOpen} onOpenChange={setIsDetailModalOpen}>
-        <DialogContent className="max-w-3xl max-h-[85vh] flex flex-col">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle className="text-2xl font-bold">
               {t({ en: 'Grievance Details', mr: 'तक्रार तपशील' })}
             </DialogTitle>
@@ -645,7 +655,7 @@ export function GrievancePage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto pr-2">
             {selectedGrievance ? (
               <div className="space-y-6 p-1">
                 {/* Scroll Notice */}
@@ -671,19 +681,19 @@ export function GrievancePage() {
                   <h3 className="text-lg font-semibold mb-3">{t({ en: 'Basic Information', mr: 'मूलभूत माहिती' })}</h3>
                   <div className="space-y-3">
                     <div>
-                      <label className="font-medium text-gray-700">{t({ en: 'Title', mr: 'विषय' })}</label>
-                      <p className="text-gray-900">{selectedGrievance.title}</p>
+                      <label className="font-medium text-muted-foreground">{t({ en: 'Title', mr: 'विषय' })}</label>
+                      <p className="text-foreground font-semibold">{selectedGrievance.title}</p>
                     </div>
                     <div>
-                      <label className="font-medium text-gray-700">{t({ en: 'Description', mr: 'वर्णन' })}</label>
-                      <p className="text-gray-900">{selectedGrievance.description}</p>
+                      <label className="font-medium text-muted-foreground">{t({ en: 'Description', mr: 'वर्णन' })}</label>
+                      <p className="text-foreground font-semibold">{selectedGrievance.description}</p>
                     </div>
                     <div>
-                      <label className="font-medium text-gray-700">{t({ en: 'Category', mr: 'श्रेणी' })}</label>
+                      <label className="font-medium text-muted-foreground">{t({ en: 'Category', mr: 'श्रेणी' })}</label>
                       <Badge variant="secondary" className="ml-2">{selectedGrievance.category}</Badge>
                     </div>
                     <div>
-                      <label className="font-medium text-gray-700">{t({ en: 'Priority', mr: 'प्राधान्यता' })}</label>
+                      <label className="font-medium text-muted-foreground">{t({ en: 'Priority', mr: 'प्राधान्यता' })}</label>
                       <Badge 
                         variant={
                           selectedGrievance.priority === 'Urgent' ? 'destructive' :
@@ -696,8 +706,8 @@ export function GrievancePage() {
                     </div>
                     {selectedGrievance.location && (
                       <div>
-                        <label className="font-medium text-gray-700">{t({ en: 'Location', mr: 'स्थान' })}</label>
-                        <p className="text-gray-900">📍 {selectedGrievance.location}</p>
+                        <label className="font-medium text-muted-foreground">{t({ en: 'Location', mr: 'स्थान' })}</label>
+                        <p className="text-foreground font-semibold">📍 {selectedGrievance.location}</p>
                       </div>
                     )}
                   </div>
@@ -709,8 +719,15 @@ export function GrievancePage() {
                 <h3 className="text-lg font-semibold mb-3">{t({ en: 'Status Information', mr: 'स्थिती माहिती' })}</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="font-medium text-gray-700">{t({ en: 'Progress Status', mr: 'प्रगती स्थिती' })}</label>
-                    <Badge className={`${getStatusColor(selectedGrievance.progressStatus)} ml-2`}>
+                    <label className="font-medium text-muted-foreground">{t({ en: 'Progress Status', mr: 'प्रगती स्थिती' })}</label>
+                    <Badge 
+                      className={`ml-2 ${
+                        selectedGrievance.progressStatus === 'Pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' :
+                        selectedGrievance.progressStatus === 'In-progress' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                        selectedGrievance.progressStatus === 'Resolved' ? 'bg-green-100 text-green-800 border-green-200' :
+                        'bg-gray-100 text-gray-800 border-gray-200'
+                      } border`}
+                    >
                       {getStatusIcon(selectedGrievance.progressStatus)}
                       <span className="ml-1">
                         {t({ 
@@ -723,21 +740,21 @@ export function GrievancePage() {
                     </Badge>
                   </div>
                   <div>
-                    <label className="font-medium text-gray-700">{t({ en: 'Admin Status', mr: 'व्यवस्थापक स्थिती' })}</label>
+                    <label className="font-medium text-muted-foreground">{t({ en: 'Admin Status', mr: 'व्यवस्थापक स्थिती' })}</label>
                     <Badge 
-                      variant={
-                        selectedGrievance.adminStatus === 'Approved' ? 'default' :
-                        selectedGrievance.adminStatus === 'Rejected' ? 'destructive' : 'secondary'
-                      }
-                      className="ml-2"
+                      className={`ml-2 border ${
+                        selectedGrievance.adminStatus === 'Approved' ? 'bg-green-100 text-green-800 border-green-200' :
+                        selectedGrievance.adminStatus === 'Rejected' ? 'bg-red-100 text-red-800 border-red-200' :
+                        'bg-gray-100 text-gray-800 border-gray-200'
+                      }`}
                     >
                       {selectedGrievance.adminStatus}
                     </Badge>
                   </div>
                   {selectedGrievance.assignedWorker && (
                     <div>
-                      <label className="font-medium text-gray-700">{t({ en: 'Assigned Worker', mr: 'नियुक्त कामगार' })}</label>
-                      <p className="text-gray-900">{selectedGrievance.assignedWorker.name} - {selectedGrievance.assignedWorker.department}</p>
+                      <label className="font-medium text-muted-foreground">{t({ en: 'Assigned Worker', mr: 'नियुक्त कामगार' })}</label>
+                      <p className="text-foreground font-semibold">{selectedGrievance.assignedWorker.name} - {selectedGrievance.assignedWorker.department}</p>
                     </div>
                   )}
                 </div>
@@ -748,12 +765,12 @@ export function GrievancePage() {
                 <h3 className="text-lg font-semibold mb-3">{t({ en: 'Submission Details', mr: 'सबमिशन तपशील' })}</h3>
                 <div className="space-y-3">
                   <div>
-                    <label className="font-medium text-gray-700">{t({ en: 'Submitted On', mr: 'सबमिट दिनांक' })}</label>
-                    <p className="text-gray-900">{new Date(selectedGrievance.createdAt).toLocaleString()}</p>
+                    <label className="font-medium text-muted-foreground">{t({ en: 'Submitted On', mr: 'सबमिट दिनांक' })}</label>
+                    <p className="text-foreground font-semibold">{new Date(selectedGrievance.createdAt).toLocaleString()}</p>
                   </div>
                   <div>
-                    <label className="font-medium text-gray-700">{t({ en: 'Last Updated', mr: 'शेवटी अद्ययावत' })}</label>
-                    <p className="text-gray-900">{new Date(selectedGrievance.updatedAt).toLocaleString()}</p>
+                    <label className="font-medium text-muted-foreground">{t({ en: 'Last Updated', mr: 'शेवटी अद्ययावत' })}</label>
+                    <p className="text-foreground font-semibold">{new Date(selectedGrievance.updatedAt).toLocaleString()}</p>
                   </div>
                 </div>
               </div>
@@ -764,7 +781,11 @@ export function GrievancePage() {
                   <h3 className="text-lg font-semibold mb-3">{t({ en: 'Resolution Photos', mr: 'निराकरण फोटो' })}</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {selectedGrievance.resolutionPhotos.map((photo, index) => (
-                      <div key={index} className="aspect-square overflow-hidden rounded-lg border">
+                      <div 
+                        key={index} 
+                        className="aspect-square overflow-hidden rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => setSelectedImage(photo)}
+                      >
                         <ImageWithFallback
                           src={photo}
                           alt={`Resolution photo ${index + 1}`}
@@ -782,7 +803,11 @@ export function GrievancePage() {
                   <h3 className="text-lg font-semibold mb-3">{t({ en: 'Submitted Photos', mr: 'सबमिट केलेले फोटो' })}</h3>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                     {selectedGrievance.photos.map((photo, index) => (
-                      <div key={index} className="aspect-square overflow-hidden rounded-lg border">
+                      <div 
+                        key={index} 
+                        className="aspect-square overflow-hidden rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                        onClick={() => setSelectedImage(photo)}
+                      >
                         <ImageWithFallback
                           src={photo}
                           alt={`Grievance photo ${index + 1}`}
@@ -801,10 +826,44 @@ export function GrievancePage() {
           )}
           </div>
 
-          <div className="flex justify-end pt-4 border-t">
+          <div className="flex justify-end pt-4 border-t flex-shrink-0">
             <Button
               variant="outline"
               onClick={() => setIsDetailModalOpen(false)}
+              className="border-black text-black hover:bg-black hover:text-white"
+            >
+              {t({ en: 'Close', mr: 'बंद करा' })}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Image Viewer Modal */}
+      <Dialog open={selectedImage !== null} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+          <DialogHeader className="flex-shrink-0">
+            <DialogTitle className="text-xl font-bold">
+              {t({ en: 'Image Viewer', mr: 'प्रतिमा दर्शक' })}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="flex-1 flex items-center justify-center p-4">
+            {selectedImage && (
+              <div className="relative w-full h-full flex items-center justify-center">
+                <ImageWithFallback
+                  src={selectedImage}
+                  alt="Full size image"
+                  className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                />
+              </div>
+            )}
+          </div>
+          
+          <div className="flex justify-end pt-4 border-t flex-shrink-0">
+            <Button
+              variant="outline"
+              onClick={() => setSelectedImage(null)}
+              className="border-black text-black hover:bg-black hover:text-white"
             >
               {t({ en: 'Close', mr: 'बंद करा' })}
             </Button>

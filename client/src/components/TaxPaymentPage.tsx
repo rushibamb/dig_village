@@ -58,69 +58,8 @@ export function TaxPaymentPage() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [selectedTaxForPayment, setSelectedTaxForPayment] = useState<TaxRecord | null>(null);
 
-  // Mock database of tax records
-  const taxDatabase: TaxRecord[] = [
-    {
-      id: 'PTAX001',
-      ownerName: 'राम शर्मा',
-      houseNumber: '123',
-      type: 'property',
-      amount: 2500,
-      dueDate: '31 Jan 2024',
-      status: 'pending',
-      details: {
-        area: '1200 sq ft',
-        assessmentYear: '2023-24',
-        wardNumber: '2',
-        propertyType: 'Residential'
-      }
-    },
-    {
-      id: 'WTAX001',
-      ownerName: 'राम शर्मा',
-      houseNumber: '123',
-      type: 'water',
-      amount: 850,
-      dueDate: '15 Feb 2024',
-      status: 'pending',
-      details: {
-        connectionNumber: 'WC123456',
-        consumption: '15,000 liters',
-        billingPeriod: 'Jan 2024',
-        meterReading: '45230'
-      }
-    },
-    {
-      id: 'PTAX002',
-      ownerName: 'सीता पटेल',
-      houseNumber: '456',
-      type: 'property',
-      amount: 3200,
-      dueDate: '31 Jan 2024',
-      status: 'overdue',
-      details: {
-        area: '1500 sq ft',
-        assessmentYear: '2023-24',
-        wardNumber: '3',
-        propertyType: 'Commercial'
-      }
-    },
-    {
-      id: 'WTAX002',
-      ownerName: 'मोहन कुमार',
-      houseNumber: '789',
-      type: 'water',
-      amount: 1200,
-      dueDate: '15 Feb 2024',
-      status: 'paid',
-      details: {
-        connectionNumber: 'WC789012',
-        consumption: '22,000 liters',
-        billingPeriod: 'Jan 2024',
-        meterReading: '67890'
-      }
-    }
-  ];
+  // Tax records will be fetched from API
+  const [taxDatabase, setTaxDatabase] = useState<TaxRecord[]>([]);
 
   const handleSearch = async () => {
     if (!isLoggedIn) {

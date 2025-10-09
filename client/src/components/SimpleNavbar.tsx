@@ -8,7 +8,6 @@ import {
   CreditCard, 
   FileText, 
   Users, 
-  ClipboardList,
   Languages,
   Menu,
   X,
@@ -47,7 +46,6 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
     if (path === '/media') return 'media';
     if (path === '/news') return 'news';
     if (path === '/contracts') return 'contracts';
-    if (path === '/dashboard') return 'dashboard';
     return 'home';
   };
 
@@ -79,7 +77,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
         'media': '/media',
         'news': '/news',
         'contracts': '/contracts',
-        'dashboard': '/dashboard'
+        'profile': '/profile',
       };
       const route = routes[page];
       if (route) {
@@ -139,13 +137,6 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
       icon: FileBarChart,
       gradient: 'from-teal-500 to-cyan-600'
     },
-    {
-      id: 'dashboard',
-      label: { en: 'Dashboard', mr: 'डॅशबोर्ड' },
-      icon: UserCircle,
-      gradient: 'from-orange-500 to-red-600',
-      requiresAuth: true
-    }
   ];
 
   const NavItemButton = ({ item, isMobile = false }: { item: typeof navItems[0], isMobile?: boolean }) => {
@@ -173,10 +164,10 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
       <Button
         variant={activePage === item.id ? 'default' : 'ghost'}
         onClick={handleClick}
-        className={`${isMobile ? 'justify-start w-full' : ''} gap-2 relative overflow-hidden group transition-all duration-500 transform ${ 
+        className={`navbar-button ${isMobile ? 'justify-start w-full' : ''} gap-2 relative overflow-hidden group transition-all duration-500 transform ${ 
           activePage === item.id 
             ? `bg-gradient-to-r ${item.gradient} text-white shadow-xl hover-lift animate-glow scale-105` 
-            : 'hover:bg-gradient-to-r hover:' + item.gradient + ' hover:text-white hover:shadow-lg hover-scale glass-effect border-0 hover:scale-105'
+            : 'glass-effect border-0 hover:scale-105 hover:!bg-blue-500 hover:!bg-gradient-to-r hover:!from-blue-500 hover:!to-blue-600 hover:!text-white hover:shadow-lg'
         }`}
         title={item.requiresAuth && !isLoggedIn ? t({ en: 'Login required', mr: 'लॉगिन आवश्यक' }) : undefined}
       >
@@ -220,7 +211,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
                 variant="ghost"
                 size="sm"
                 onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                className="glass-effect hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-white transition-all duration-300 hover-scale"
+                className="glass-effect hover:bg-gradient-to-r hover:from-blue-500 hover:to-purple-600 hover:text-blue-600 transition-all duration-300 hover-scale"
               >
                 {isMobileMenuOpen ? (
                   <X className="h-5 w-5" />
@@ -237,14 +228,17 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
             {/* User Menu */}
             {isLoggedIn ? (
               <div className="hidden sm:flex items-center gap-3">
-                <div className="flex items-center gap-2 glass-effect px-4 py-2 rounded-lg hover-glow transition-all duration-300 transform hover:scale-105 cursor-pointer"
-                     onClick={() => handleNavigation('dashboard')}
-                     title={t({ en: 'Go to Dashboard', mr: 'डॅशबोर्डवर जा' })}>
+                <Button
+                  variant="ghost"
+                  onClick={() => handleNavigation('profile')}
+                  className="navbar-button flex items-center gap-2 glass-effect px-4 py-2 rounded-lg hover:!bg-blue-500 hover:!bg-gradient-to-r hover:!from-blue-500 hover:!to-blue-600 hover:!text-white transition-all duration-300 hover:scale-105"
+                  title={t({ en: 'View Profile', mr: 'प्रोफाइल पहा' })}
+                >
                   <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center animate-pulse-slow shadow-lg">
                     <UserCircle className="h-4 w-4 text-white" />
                   </div>
                   <span className="text-gray-800 font-medium">{user?.name?.split(' ')[0] || 'User'}</span>
-                </div>
+                </Button>
                 <Button
                   variant="outline"
                   size="sm"
@@ -327,12 +321,20 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
               <div className="pt-3 border-t border-white/30 animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
                 {isLoggedIn ? (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-3 px-3 py-2 glass-effect rounded-lg">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        handleNavigation('profile');
+                        setIsMobileMenuOpen(false);
+                      }}
+                      className="navbar-button w-full justify-start gap-3 glass-effect hover:!bg-blue-500 hover:!bg-gradient-to-r hover:!from-blue-500 hover:!to-blue-600 hover:!text-white transition-all duration-300"
+                      title={t({ en: 'View Profile', mr: 'प्रोफाइल पहा' })}
+                    >
                       <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-emerald-600 flex items-center justify-center shadow-lg">
                         <UserCircle className="h-4 w-4 text-white" />
                       </div>
                       <span className="text-gray-800 font-medium">{user?.name || 'User'}</span>
-                    </div>
+                    </Button>
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -357,7 +359,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
                         }
                         setIsMobileMenuOpen(false);
                       }}
-                      className="w-full justify-start gap-3 glass-effect border-green-200 text-green-600 hover:bg-gradient-to-r hover:from-green-500 hover:to-emerald-600 hover:text-white hover:border-transparent transition-all duration-300"
+                      className="w-full justify-start gap-3 glass-effect border-green-200 text-green-600 hover:bg-gradient-to-r hover:from-green-500 hover:to-emerald-600 hover:text-blue-600 hover:border-transparent transition-all duration-300"
                     >
                       <User className="h-4 w-4" />
                       {t({ en: 'Register', mr: 'नोंदणी' })}

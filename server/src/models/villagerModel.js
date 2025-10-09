@@ -54,6 +54,14 @@ const villagerSchema = mongoose.Schema(
     submittedAt: {
       type: Date,
       default: Date.now
+    },
+    otp: {
+      type: String,
+      required: false
+    },
+    otpExpiry: {
+      type: Date,
+      required: false
     }
   },
   {

@@ -122,10 +122,25 @@ const updateProject = async (req, res) => {
       });
     }
 
+    // Clean the update data to remove fields that shouldn't be updated for certain statuses
+    const updateData = { ...req.body };
+    
+    // If updating to Ongoing or Completed, remove Tender-specific required fields if they're empty
+    if (status === 'Ongoing' || status === 'Completed') {
+      if (!updateData.description || (!updateData.description.en && !updateData.description.mr)) {
+        delete updateData.description;
+      }
+      if (!updateData.tenderNoticeUrl) {
+        delete updateData.tenderNoticeUrl;
+      }
+    }
+
+    console.log('Updating project with data:', JSON.stringify(updateData, null, 2));
+
     // Update the project
     const updatedProject = await Project.findByIdAndUpdate(
       req.params.id,
-      req.body,
+      updateData,
       {
         new: true,
         runValidators: true
@@ -138,6 +153,7 @@ const updateProject = async (req, res) => {
       message: 'Project updated successfully'
     });
   } catch (error) {
+    console.error('Project update error:', error);
     if (error.name === 'CastError') {
       return res.status(400).json({
         success: false,

@@ -1,9 +1,38 @@
 const Villager = require('../models/villagerModel');
 const { Parser } = require('json2csv');
+const twilio = require('twilio');
 
-// In-memory storage for OTP (for development)
-// In production, use Redis or database for OTP storage
-const otpStorage = new Map();
+// Check if Twilio credentials are available
+const isTwilioConfigured = () => {
+  return !!(
+    process.env.TWILIO_ACCOUNT_SID &&
+    process.env.TWILIO_AUTH_TOKEN &&
+    process.env.TWILIO_PHONE_NUMBER &&
+    process.env.TWILIO_ACCOUNT_SID !== 'paste_your_account_sid_here' &&
+    process.env.TWILIO_AUTH_TOKEN !== 'paste_your_auth_token_here' &&
+    process.env.TWILIO_PHONE_NUMBER !== 'paste_your_twilio_phone_number_here'
+  );
+};
+
+// Initialize Twilio client only if credentials are available
+let client = null;
+if (isTwilioConfigured()) {
+  try {
+    client = twilio(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+    console.log('✅ Twilio client initialized successfully');
+  } catch (error) {
+    console.error('❌ Failed to initialize Twilio client:', error.message);
+  }
+} else {
+  console.warn('⚠️ Twilio credentials not configured. SMS functionality will be limited.');
+  console.log('Please add the following to your .env file:');
+  console.log('TWILIO_ACCOUNT_SID=your_account_sid');
+  console.log('TWILIO_AUTH_TOKEN=your_auth_token');
+  console.log('TWILIO_PHONE_NUMBER=your_twilio_phone_number');
+}
 
 // @desc    Submit new villager request
 // @route   POST /api/villagers/requests/new
@@ -126,34 +155,72 @@ const generateOtpForEdit = async (req, res) => {
       });
     }
 
-    // Generate 6-digit OTP
+    // Generate a random 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
     
-    // Store OTP with expiration (5 minutes) - store under multiple formats for flexibility
-    const expirationTime = Date.now() + 5 * 60 * 1000; // 5 minutes
-    const otpData = {
-      otp,
-      expiresAt: expirationTime,
-      villagerId: villager._id
-    };
+    // Set OTP expiry time (10 minutes from now)
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000);
     
-    // Store OTP under multiple mobile number formats for flexible lookup
-    otpStorage.set(mobileNumber, otpData);
-    otpStorage.set(normalizedMobileNumber, otpData);
-    if (mobileNumber.replace(/^\+91|^91/, '') !== normalizedMobileNumber && mobileNumber.replace(/^\+91|^91/, '') !== mobileNumber) {
-      otpStorage.set(mobileNumber.replace(/^\+91|^91/, ''), otpData);
+    // Save OTP and expiry time to the villager document in database
+    villager.otp = otp;
+    villager.otpExpiry = otpExpiry;
+    await villager.save();
+
+    // Format mobile number for E.164 (add +91 if not present)
+    let formattedMobileNumber = mobileNumber.trim();
+    if (!formattedMobileNumber.startsWith('+')) {
+      if (formattedMobileNumber.startsWith('0')) {
+        formattedMobileNumber = '+91' + formattedMobileNumber.substring(1);
+      } else {
+        formattedMobileNumber = '+91' + formattedMobileNumber;
+      }
     }
 
-    // TODO: In production, integrate with SMS service
-    // For now, log the OTP (remove in production)
-    console.log(`OTP for ${mobileNumber}: ${otp}`);
+    // Check if Twilio is configured
+    if (!client || !isTwilioConfigured()) {
+      console.log(`OTP generated for ${formattedMobileNumber}: ${otp} (Twilio not configured)`);
+      
+      res.status(200).json({
+        success: true,
+        message: 'OTP generated successfully (SMS service not configured)',
+        otp: otp, // Always show OTP when Twilio is not configured
+        isMock: true
+      });
+      return;
+    }
 
-    res.status(200).json({
-      success: true,
-      message: 'OTP generated successfully',
-      // In production, don't send OTP in response
-      otp: process.env.NODE_ENV === 'development' ? otp : undefined
-    });
+    try {
+      // Send SMS using Twilio
+      const message = await client.messages.create({
+        body: `Your OTP for village portal verification is: ${otp}. This OTP is valid for 10 minutes. Do not share this OTP with anyone.`,
+        from: process.env.TWILIO_PHONE_NUMBER,
+        to: formattedMobileNumber
+      });
+
+      console.log(`SMS sent successfully to ${formattedMobileNumber}. Message SID: ${message.sid}`);
+      console.log(`OTP for ${formattedMobileNumber}: ${otp}`);
+
+      res.status(200).json({
+        success: true,
+        message: 'OTP sent successfully via SMS',
+        // In development, send OTP in response for testing
+        otp: process.env.NODE_ENV === 'development' ? otp : undefined,
+        isMock: false
+      });
+
+    } catch (smsError) {
+      console.error('Twilio SMS error:', smsError);
+      
+      // If Twilio fails, still save the OTP for development/testing
+      res.status(200).json({
+        success: true,
+        message: 'OTP generated successfully (SMS service unavailable)',
+        otp: process.env.NODE_ENV === 'development' ? otp : undefined,
+        smsError: smsError.message,
+        isMock: true
+      });
+    }
+
   } catch (error) {
     console.error('Error generating OTP:', error);
     res.status(500).json({
@@ -178,7 +245,7 @@ const verifyOtpAndGetVillager = async (req, res) => {
       });
     }
 
-    // Normalize mobile number for OTP lookup
+    // Normalize mobile number for database lookup
     let normalizedMobileNumber = mobileNumber.trim();
     if (normalizedMobileNumber.startsWith('+91')) {
       normalizedMobileNumber = normalizedMobileNumber.substring(3);
@@ -186,54 +253,57 @@ const verifyOtpAndGetVillager = async (req, res) => {
       normalizedMobileNumber = normalizedMobileNumber.substring(2);
     }
 
-    // Get stored OTP data - try both original and normalized formats
-    let storedOtpData = otpStorage.get(mobileNumber);
-    if (!storedOtpData) {
-      storedOtpData = otpStorage.get(normalizedMobileNumber);
+    // Find villager by mobile number (try multiple formats)
+    let villager = await Villager.findOne({ mobileNumber });
+    if (!villager) {
+      villager = await Villager.findOne({ mobileNumber: normalizedMobileNumber });
     }
-    if (!storedOtpData) {
-      storedOtpData = otpStorage.get(mobileNumber.replace(/^\+91|^91/, ''));
+    if (!villager) {
+      villager = await Villager.findOne({ mobileNumber: mobileNumber.replace(/^\+91|^91/, '') });
     }
-    
-    if (!storedOtpData) {
+
+    if (!villager) {
+      return res.status(404).json({
+        success: false,
+        message: 'No villager found with this mobile number'
+      });
+    }
+
+    // Check if OTP exists in database
+    if (!villager.otp || !villager.otpExpiry) {
       return res.status(400).json({
         success: false,
-        message: 'OTP not found or expired'
+        message: 'No OTP found for this mobile number'
       });
     }
 
     // Check if OTP has expired
-    if (Date.now() > storedOtpData.expiresAt) {
-      otpStorage.delete(mobileNumber);
-      otpStorage.delete(normalizedMobileNumber);
-      otpStorage.delete(mobileNumber.replace(/^\+91|^91/, ''));
+    if (new Date() > villager.otpExpiry) {
+      // Clear expired OTP from database
+      villager.otp = null;
+      villager.otpExpiry = null;
+      await villager.save();
+      
       return res.status(400).json({
         success: false,
         message: 'OTP has expired'
       });
     }
 
-    // Verify OTP
-    if (storedOtpData.otp !== otp) {
+    // Verify OTP matches
+    if (villager.otp !== otp) {
       return res.status(400).json({
         success: false,
         message: 'Invalid OTP'
       });
     }
 
-    // Get villager data
-    const villager = await Villager.findById(storedOtpData.villagerId);
-    if (!villager) {
-      return res.status(404).json({
-        success: false,
-        message: 'Villager not found'
-      });
-    }
+    // Clear OTP fields from database for security after successful verification
+    villager.otp = null;
+    villager.otpExpiry = null;
+    await villager.save();
 
-    // Clear OTP after successful verification
-    otpStorage.delete(mobileNumber);
-    otpStorage.delete(normalizedMobileNumber);
-    otpStorage.delete(mobileNumber.replace(/^\+91|^91/, ''));
+    console.log(`OTP verified successfully for mobile number: ${mobileNumber}`);
 
     res.status(200).json({
       success: true,
@@ -561,19 +631,7 @@ const adminEditVillager = async (req, res) => {
       });
     }
 
-    // Check for duplicate mobile number
-    if (mobileNumber && mobileNumber !== villager.mobileNumber) {
-      const existingVillager = await Villager.findOne({
-        mobileNumber,
-        _id: { $ne: id }
-      });
-      if (existingVillager) {
-        return res.status(400).json({
-          success: false,
-          message: 'Mobile number already exists'
-        });
-      }
-    }
+    // Allow same mobile number for multiple villagers (family members can share mobile numbers)
 
     // Check for duplicate Aadhar number
     if (aadharNumber && aadharNumber !== villager.aadharNumber) {
@@ -712,11 +770,14 @@ const exportVillagersToCsv = async (req, res) => {
 // @access  Public
 const getVillagerStats = async (req, res) => {
   try {
-    // Get total count of all villagers
-    const total = await Villager.countDocuments();
+    // Get total count of only approved villagers
+    const total = await Villager.countDocuments({ status: 'Approved' });
     
-    // Get count by gender
+    // Get count by gender for approved villagers only
     const genderStats = await Villager.aggregate([
+      {
+        $match: { status: 'Approved' }
+      },
       {
         $group: {
           _id: '$gender',
@@ -757,12 +818,51 @@ const getVillagerStats = async (req, res) => {
   }
 };
 
+// @desc    Get logged-in user's villager profile
+// @route   GET /api/villagers/my-profile
+// @access  Private
+const getMyVillagerProfile = async (req, res) => {
+  try {
+    // Use the logged-in user's ID from req.user.id
+    const userId = req.user.id;
+
+    // Find the villager document where submittedBy matches the user's ID
+    const villager = await Villager.findOne({ submittedBy: userId })
+      .populate('submittedBy', 'name email')
+      .sort({ createdAt: -1 }); // Get the most recent profile if multiple exist
+
+    if (!villager) {
+      // If no profile found, send 200 OK response with null data
+      return res.status(200).json({
+        success: true,
+        message: 'No villager profile found for this user',
+        data: null
+      });
+    }
+
+    // If villager profile is found, send it back as the response
+    res.status(200).json({
+      success: true,
+      message: 'Villager profile retrieved successfully',
+      data: villager
+    });
+  } catch (error) {
+    console.error('Error fetching user villager profile:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error',
+      error: error.message
+    });
+  }
+};
+
 module.exports = {
   submitNewVillagerRequest,
   generateOtpForEdit,
   verifyOtpAndGetVillager,
   submitVillagerEditRequest,
   getVillagerStats,
+  getMyVillagerProfile,
   adminGetAllVillagers,
   adminAddVillager,
   adminUpdateVillagerStatus,

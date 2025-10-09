@@ -3,308 +3,372 @@ const csv = require('csv-parser');
 const TaxRecord = require('../models/taxRecordModel');
 
 const uploadTaxRecordsCsv = async (req, res) => {
+  console.log("--- CSV Upload Process Started ---");
   try {
+    console.log("Multer file data received:", req.file); // Check what multer provides
+    console.log("Request body:", req.body);
+    console.log("Request headers:", req.headers);
+    
     if (!req.file) {
-      return res.status(400).json({
+      console.error("ERROR: No file was received by the server. Check the field name in the frontend FormData.");
+      return res.status(400).json({ 
         success: false,
-        message: 'No file uploaded'
+        message: "No file uploaded. Make sure the file field name is correct." 
       });
     }
+
+    console.log("File details:");
+    console.log("- Path:", req.file.path);
+    console.log("- Original name:", req.file.originalname);
+    console.log("- Mimetype:", req.file.mimetype);
+    console.log("- Size:", req.file.size);
 
     const results = [];
-    const filePath = req.file.path;
-
-    // Read and parse the CSV file
-    await new Promise((resolve, reject) => {
-      fs.createReadStream(filePath)
-        .pipe(csv())
-        .on('data', (data) => {
-          // Create tax record object from CSV data
-          const taxRecord = {
-            houseNumber: data.houseNumber,
-            ownerName: data.ownerName,
-            taxType: data.taxType,
-            amountDue: parseFloat(data.amountDue),
-            dueDate: new Date(data.dueDate),
-            status: data.status || 'Pending',
-            villagerId: data.villagerId || null
-          };
-          results.push(taxRecord);
-        })
-        .on('end', () => {
-          resolve();
-        })
-        .on('error', (error) => {
-          reject(error);
-        });
-    });
-
-    // Insert all records into the database
-    const insertedRecords = await TaxRecord.insertMany(results);
-
-    // Clean up the uploaded file
-    fs.unlinkSync(filePath);
-
-    res.status(200).json({
-      success: true,
-      message: `Successfully imported ${insertedRecords.length} tax records`,
-      count: insertedRecords.length
-    });
-
-  } catch (error) {
-    console.error('Error uploading tax records:', error);
     
-    // Clean up the uploaded file if it exists
-    if (req.file && req.file.path) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (unlinkError) {
-        console.error('Error cleaning up file:', unlinkError);
-      }
-    }
-
-    res.status(500).json({
-      success: false,
-      message: 'Error processing tax records upload',
-      error: error.message
-    });
-  }
-};
-
-// Create a single tax record
-const createTaxRecord = async (req, res) => {
-  try {
-    const { houseNumber, ownerName, taxType, amountDue, dueDate, status, villagerId } = req.body;
-
-    // Validate required fields
-    if (!houseNumber || !ownerName || !taxType || !amountDue || !dueDate) {
+    // Check if file exists
+    if (!fs.existsSync(req.file.path)) {
+      console.error("ERROR: File does not exist at path:", req.file.path);
       return res.status(400).json({
         success: false,
-        message: 'Missing required fields: houseNumber, ownerName, taxType, amountDue, dueDate'
+        message: "Uploaded file not found on server"
       });
     }
 
-    const taxRecord = new TaxRecord({
-      houseNumber,
-      ownerName,
-      taxType,
-      amountDue: parseFloat(amountDue),
-      dueDate: new Date(dueDate),
-      status: status || 'Pending',
-      villagerId: villagerId || null
-    });
-
-    const savedRecord = await taxRecord.save();
-
-    res.status(201).json({
-      success: true,
-      message: 'Tax record created successfully',
-      data: savedRecord
-    });
-
+    fs.createReadStream(req.file.path)
+      .pipe(csv())
+      .on('data', (data) => {
+        console.log("Parsed CSV row:", data);
+        results.push(data);
+      })
+      .on('end', async () => {
+        try {
+          console.log(`CSV parsing finished. Found ${results.length} records.`);
+          // Optional: Log the first record to check data structure
+          if (results.length > 0) {
+            console.log("First record sample:", results[0]);
+          }
+          
+          await TaxRecord.insertMany(results);
+          console.log("Successfully inserted records into the database.");
+          
+          // Clean up the temporary file
+          fs.unlinkSync(req.file.path);
+          console.log("Temporary file cleaned up.");
+          
+          res.status(201).json({
+            success: true,
+            message: `Successfully uploaded and inserted ${results.length} tax records.`,
+            count: results.length
+          });
+        } catch (dbError) {
+          console.error("---!! DATABASE ERROR during CSV insert !!---", dbError);
+          res.status(500).json({ 
+            success: false,
+            message: "Error saving records to the database.", 
+            error: dbError.message 
+          });
+        }
+      })
+      .on('error', (csvError) => {
+        console.error("---!! CSV PARSING ERROR !!---", csvError);
+        res.status(400).json({
+          success: false,
+          message: "Error parsing CSV file",
+          error: csvError.message
+        });
+      });
   } catch (error) {
-    console.error('Error creating tax record:', error);
-    res.status(500).json({
+    console.error("---!! CRITICAL ERROR during CSV upload process !!---", error);
+    res.status(500).json({ 
       success: false,
-      message: 'Error creating tax record',
-      error: error.message
+      message: "An unexpected error occurred during file upload.", 
+      error: error.message 
     });
   }
 };
 
-// Get all tax records with filtering and search
+// @desc    Get all tax records with filtering and pagination
+// @route   GET /api/admin/taxes
+// @access  Private/Admin
 const getAllTaxRecords = async (req, res) => {
   try {
-    const { status, taxType, search, page = 1, limit = 10 } = req.query;
+    const { page = 1, limit = 10, status, taxType, search } = req.query;
     
-    // Build query object
-    const query = {};
-    
-    // Filter by status
+    // Build filter object
+    const filter = {};
     if (status && status !== 'all') {
-      query.status = status;
+      filter.status = status;
     }
-    
-    // Filter by tax type
     if (taxType && taxType !== 'all') {
-      query.taxType = taxType;
+      filter.taxType = taxType;
     }
-    
-    // Search by house number or owner name
     if (search) {
-      query.$or = [
-        { houseNumber: { $regex: search, $options: 'i' } },
-        { ownerName: { $regex: search, $options: 'i' } }
+      filter.$or = [
+        { ownerName: { $regex: search, $options: 'i' } },
+        { houseNumber: { $regex: search, $options: 'i' } }
       ];
     }
 
     // Calculate pagination
-    const skip = (parseInt(page) - 1) * parseInt(limit);
+    const skip = (page - 1) * limit;
+    
+    // Get tax records with filtering and pagination
+    const taxRecords = await TaxRecord.find(filter)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
 
-    // Execute query with pagination
-    const [records, total] = await Promise.all([
-      TaxRecord.find(query)
-        .populate('villagerId', 'name email phone')
-        .sort({ createdAt: -1 })
-        .skip(skip)
-        .limit(parseInt(limit)),
-      TaxRecord.countDocuments(query)
+    // Get total count for pagination
+    const total = await TaxRecord.countDocuments(filter);
+
+    res.status(200).json({
+      success: true,
+      count: taxRecords.length,
+      total,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / limit),
+      data: taxRecords
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch tax records',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Create a new tax record
+// @route   POST /api/admin/taxes
+// @access  Private/Admin
+const createTaxRecord = async (req, res) => {
+  try {
+    const taxRecord = await TaxRecord.create(req.body);
+
+    res.status(201).json({
+      success: true,
+      data: taxRecord,
+      message: 'Tax record created successfully'
+    });
+  } catch (error) {
+    res.status(400).json({
+      success: false,
+      message: 'Failed to create tax record',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get a single tax record by ID
+// @route   GET /api/admin/taxes/:id
+// @access  Private/Admin
+const getTaxRecordById = async (req, res) => {
+  try {
+    const taxRecord = await TaxRecord.findById(req.params.id);
+
+    if (!taxRecord) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tax record not found'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      data: taxRecord
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tax record ID'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to fetch tax record',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Update a tax record
+// @route   PUT /api/admin/taxes/:id
+// @access  Private/Admin
+const updateTaxRecord = async (req, res) => {
+  try {
+    const taxRecord = await TaxRecord.findById(req.params.id);
+
+    if (!taxRecord) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tax record not found'
+      });
+    }
+
+    const updatedTaxRecord = await TaxRecord.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      {
+        new: true,
+        runValidators: true
+      }
+    );
+
+    res.status(200).json({
+      success: true,
+      data: updatedTaxRecord,
+      message: 'Tax record updated successfully'
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tax record ID'
+      });
+    }
+    
+    res.status(400).json({
+      success: false,
+      message: 'Failed to update tax record',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Delete a tax record
+// @route   DELETE /api/admin/taxes/:id
+// @access  Private/Admin
+const deleteTaxRecord = async (req, res) => {
+  try {
+    const taxRecord = await TaxRecord.findById(req.params.id);
+
+    if (!taxRecord) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tax record not found'
+      });
+    }
+
+    await TaxRecord.findByIdAndDelete(req.params.id);
+
+    res.status(200).json({
+      success: true,
+      message: 'Tax record deleted successfully'
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tax record ID'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete tax record',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Mark tax record as paid
+// @route   PUT /api/admin/taxes/:id/mark-paid
+// @access  Private/Admin
+const markTaxRecordAsPaid = async (req, res) => {
+  try {
+    const taxRecord = await TaxRecord.findById(req.params.id);
+
+    if (!taxRecord) {
+      return res.status(404).json({
+        success: false,
+        message: 'Tax record not found'
+      });
+    }
+
+    taxRecord.status = 'Paid';
+    taxRecord.paymentDate = new Date();
+    await taxRecord.save();
+
+    res.status(200).json({
+      success: true,
+      data: taxRecord,
+      message: 'Tax record marked as paid successfully'
+    });
+  } catch (error) {
+    if (error.name === 'CastError') {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid tax record ID'
+      });
+    }
+    
+    res.status(500).json({
+      success: false,
+      message: 'Failed to mark tax record as paid',
+      error: error.message
+    });
+  }
+};
+
+// @desc    Get tax statistics
+// @route   GET /api/admin/taxes/stats
+// @access  Private/Admin
+const getTaxStats = async (req, res) => {
+  try {
+    const totalRecords = await TaxRecord.countDocuments();
+    const paidRecords = await TaxRecord.countDocuments({ status: 'Paid' });
+    const pendingRecords = await TaxRecord.countDocuments({ status: 'Pending' });
+    const overdueRecords = await TaxRecord.countDocuments({ 
+      status: 'Pending', 
+      dueDate: { $lt: new Date() } 
+    });
+
+    // Calculate total amounts
+    const totalAmount = await TaxRecord.aggregate([
+      { $group: { _id: null, total: { $sum: '$amountDue' } } }
+    ]);
+
+    const paidAmount = await TaxRecord.aggregate([
+      { $match: { status: 'Paid' } },
+      { $group: { _id: null, total: { $sum: '$amountDue' } } }
+    ]);
+
+    const pendingAmount = await TaxRecord.aggregate([
+      { $match: { status: 'Pending' } },
+      { $group: { _id: null, total: { $sum: '$amountDue' } } }
     ]);
 
     res.status(200).json({
       success: true,
-      data: records,
-      pagination: {
-        currentPage: parseInt(page),
-        totalPages: Math.ceil(total / parseInt(limit)),
-        totalRecords: total,
-        recordsPerPage: parseInt(limit)
+      data: {
+        totalRecords,
+        paidRecords,
+        pendingRecords,
+        overdueRecords,
+        totalAmount: totalAmount[0]?.total || 0,
+        paidAmount: paidAmount[0]?.total || 0,
+        pendingAmount: pendingAmount[0]?.total || 0,
+        collectionRate: totalRecords > 0 ? ((paidRecords / totalRecords) * 100).toFixed(2) : 0
       }
     });
-
   } catch (error) {
-    console.error('Error fetching tax records:', error);
     res.status(500).json({
       success: false,
-      message: 'Error fetching tax records',
-      error: error.message
-    });
-  }
-};
-
-// Update a tax record
-const updateTaxRecord = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { houseNumber, ownerName, taxType, amountDue, dueDate, status, villagerId } = req.body;
-
-    // Validate required fields
-    if (!houseNumber || !ownerName || !taxType || !amountDue || !dueDate) {
-      return res.status(400).json({
-        success: false,
-        message: 'Missing required fields: houseNumber, ownerName, taxType, amountDue, dueDate'
-      });
-    }
-
-    const updatedRecord = await TaxRecord.findByIdAndUpdate(
-      id,
-      {
-        houseNumber,
-        ownerName,
-        taxType,
-        amountDue: parseFloat(amountDue),
-        dueDate: new Date(dueDate),
-        status: status || 'Pending',
-        villagerId: villagerId || null
-      },
-      { new: true, runValidators: true }
-    ).populate('villagerId', 'name email phone');
-
-    if (!updatedRecord) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tax record not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Tax record updated successfully',
-      data: updatedRecord
-    });
-
-  } catch (error) {
-    console.error('Error updating tax record:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error updating tax record',
-      error: error.message
-    });
-  }
-};
-
-// Delete a tax record
-const deleteTaxRecord = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const deletedRecord = await TaxRecord.findByIdAndDelete(id);
-
-    if (!deletedRecord) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tax record not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Tax record deleted successfully',
-      data: deletedRecord
-    });
-
-  } catch (error) {
-    console.error('Error deleting tax record:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error deleting tax record',
-      error: error.message
-    });
-  }
-};
-
-// Mark tax record as paid (for offline payments)
-const markAsPaid = async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { paymentDetails } = req.body;
-
-    const updateData = {
-      status: 'Paid',
-      'paymentDetails.paymentDate': new Date()
-    };
-
-    // Add payment details if provided
-    if (paymentDetails) {
-      if (paymentDetails.orderId) updateData['paymentDetails.orderId'] = paymentDetails.orderId;
-      if (paymentDetails.paymentId) updateData['paymentDetails.paymentId'] = paymentDetails.paymentId;
-      if (paymentDetails.receiptNumber) updateData['paymentDetails.receiptNumber'] = paymentDetails.receiptNumber;
-    }
-
-    const updatedRecord = await TaxRecord.findByIdAndUpdate(
-      id,
-      updateData,
-      { new: true, runValidators: true }
-    ).populate('villagerId', 'name email phone');
-
-    if (!updatedRecord) {
-      return res.status(404).json({
-        success: false,
-        message: 'Tax record not found'
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      message: 'Tax record marked as paid successfully',
-      data: updatedRecord
-    });
-
-  } catch (error) {
-    console.error('Error marking tax record as paid:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error marking tax record as paid',
+      message: 'Failed to fetch tax statistics',
       error: error.message
     });
   }
 };
 
 module.exports = {
-  uploadTaxRecordsCsv,
-  createTaxRecord,
   getAllTaxRecords,
+  createTaxRecord,
+  getTaxRecordById,
   updateTaxRecord,
   deleteTaxRecord,
-  markAsPaid
+  markTaxRecordAsPaid,
+  getTaxStats,
+  uploadTaxRecordsCsv
 };

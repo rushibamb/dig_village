@@ -36,10 +36,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
 import { useLanguage } from './LanguageProvider';
 import { ContractsManagement } from './ContractsManagement';
-import { ContractsContentManager } from './ContractsContentManager';
-import { AdminContractsTab } from './AdminContractsTab';
 import { AdminNavButton } from './AdminNavButton';
-import { AdminFloatingContractsButton } from './AdminFloatingContractsButton';
 import { 
   adminGetAllVillagers,
   adminAddNewVillager,
@@ -4085,8 +4082,6 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
         </DialogContent>
       </Dialog>
 
-            {/* Floating Contracts Button */}
-            <AdminFloatingContractsButton />
           </TabsContent>
 
           {/* Other Tab Contents */}

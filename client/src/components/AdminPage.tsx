@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import api from '../services/api';
 import { adminGetAllMediaItems, adminGetAllMediaCategories, adminCreateMediaItem, adminUpdateMediaItem, adminDeleteMediaItem, adminCreateMediaCategory, adminDeleteMediaCategory } from '../services/mediaService';
 import { 
   adminGetAllFacilities, 
@@ -36,10 +37,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
 import { useLanguage } from './LanguageProvider';
 import { ContractsManagement } from './ContractsManagement';
-import { ContractsContentManager } from './ContractsContentManager';
-import { AdminContractsTab } from './AdminContractsTab';
 import { AdminNavButton } from './AdminNavButton';
-import { AdminFloatingContractsButton } from './AdminFloatingContractsButton';
 import { 
   adminGetAllVillagers,
   adminAddNewVillager,
@@ -162,7 +160,8 @@ import {
   Edit,
   Trash2,
   Home,
-  Camera
+  Camera,
+  ExternalLink
 } from 'lucide-react';
 
 // Tax Record Form Component
@@ -267,10 +266,10 @@ const TaxRecordForm = ({ record, onSubmit, onCancel }) => {
       </div>
 
       <DialogFooter>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button type="button" className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white shadow-md hover:shadow-lg transition-all duration-300" onClick={onCancel}>
           {t({ en: 'Cancel', mr: 'रद्द करा' })}
         </Button>
-        <Button type="submit">
+        <Button type="submit" className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-black shadow-md hover:shadow-lg transition-all duration-300">
           {record ? t({ en: 'Update Record', mr: 'रेकॉर्ड अपडेट करा' }) : t({ en: 'Create Record', mr: 'रेकॉर्ड तयार करा' })}
         </Button>
       </DialogFooter>
@@ -292,6 +291,7 @@ function AdminPage() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingVillager, setEditingVillager] = useState(null);
+  const [selectedVillagerImage, setSelectedVillagerImage] = useState(null);
 
   // Grievance management states
   const [grievances, setGrievances] = useState([]);
@@ -324,6 +324,8 @@ function AdminPage() {
   const [isEditMediaOpen, setIsEditMediaOpen] = useState(false);
   const [selectedMedia, setSelectedMedia] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [isMediaViewerOpen, setIsMediaViewerOpen] = useState(false);
+  const [viewerMedia, setViewerMedia] = useState(null);
   const [newMediaItem, setNewMediaItem] = useState({
     mediaType: 'Photo',
     title: { en: '', mr: '' },
@@ -440,6 +442,10 @@ function AdminPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [selectedGrievance, setSelectedGrievance] = useState(null);
   const [resolutionPhotos, setResolutionPhotos] = useState([]);
+  
+  // Share modal states
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [shareableGrievance, setShareableGrievance] = useState(null);
 
 
   // Summary stats for villager cards
@@ -680,6 +686,10 @@ function AdminPage() {
   };
 
   const handleOpenProjectEditModal = (project) => {
+    console.log('Opening edit modal for project:', project);
+    console.log('Project status:', project.status);
+    console.log('Project description:', project.description);
+    console.log('Project tenderNoticeUrl:', project.tenderNoticeUrl);
     setEditingProject({ ...project });
     setNewPhotoUrl('');
     setUploadedPhotos([]);
@@ -894,13 +904,17 @@ function AdminPage() {
       }
 
       console.log('Sending project data:', projectData);
+      console.log('Editing project ID:', editingProject._id);
+      console.log('Project status:', editingProject.status);
 
       if (editingProject._id) {
         // Update existing project
+        console.log('Updating existing project with ID:', editingProject._id);
         await adminUpdateProject(editingProject._id, projectData);
         toast.success(t({ en: 'Project updated successfully', mr: 'प्रकल्प यशस्वीपणे अपडेट केला' }));
       } else {
         // Create new project
+        console.log('Creating new project');
         await adminCreateProject(projectData);
         toast.success(t({ en: 'Project created successfully', mr: 'प्रकल्प यशस्वीपणे तयार केला' }));
       }
@@ -977,9 +991,18 @@ function AdminPage() {
     setUploading(true);
     
     try {
-      // Check if file is too large (max 10MB)
-      if (file.size > 10 * 1024 * 1024) {
-        toast.error('File size too large. Please select a file smaller than 10MB.');
+      // Check if file is too large (max 50MB for videos, 10MB for images)
+      const maxSize = newMediaItem.mediaType === 'Video' ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+      if (file.size > maxSize) {
+        toast.error(`File size too large. Please select a file smaller than ${newMediaItem.mediaType === 'Video' ? '50MB' : '10MB'}.`);
+        setUploading(false);
+        return;
+      }
+
+      // Check authentication token
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Please log in to upload media');
         setUploading(false);
         return;
       }
@@ -987,47 +1010,53 @@ function AdminPage() {
       // Create FormData for file upload
       const formData = new FormData();
       formData.append('file', file);
+      formData.append('folder', `village-portal/media/${newMediaItem.mediaType.toLowerCase()}s`);
       
-      // Upload to server endpoint
-      const response = await fetch('/api/upload/upload', {
-        method: 'POST',
+      // Upload to server endpoint using the API service
+      const response = await api.post('/upload/upload', formData, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: formData
+          'Content-Type': 'multipart/form-data'
+        }
       });
       
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-      
-      const result = await response.json();
+      const result = response.data;
       
       if (result.success) {
         setNewMediaItem(prev => ({
           ...prev,
           fileUrl: result.data.fileUrl,
-          thumbnailUrl: result.data.thumbnailUrl
+          thumbnailUrl: result.data.thumbnailUrl || result.data.fileUrl,
+          file: file // Store the file object for later use
         }));
         
-        toast.success('File uploaded successfully to Cloudinary!');
+        toast.success(`${newMediaItem.mediaType} uploaded successfully to Cloudinary!`);
       } else {
         throw new Error(result.message || 'Upload failed');
       }
       
     } catch (error) {
       console.error('Upload error:', error);
+      console.error('Error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
       
-      // Fallback to a working placeholder URL
-      const placeholderUrl = 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=800&h=600&fit=crop';
+      // For development, use a working placeholder URL
+      const placeholderUrl = newMediaItem.mediaType === 'Video' 
+        ? 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4'
+        : 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=800&h=600&fit=crop';
       
       setNewMediaItem(prev => ({
         ...prev,
         fileUrl: placeholderUrl,
-        thumbnailUrl: placeholderUrl
+        thumbnailUrl: placeholderUrl,
+        file: file
       }));
       
-      toast.error('Upload failed. Using placeholder image.');
+      const errorMessage = error.response?.data?.message || error.message || 'Upload failed';
+      toast.warning(`${newMediaItem.mediaType} upload failed: ${errorMessage}. Using placeholder for development.`);
     } finally {
       setUploading(false);
     }
@@ -2083,6 +2112,58 @@ function AdminPage() {
     }
   };
 
+  // Share grievance handler
+  const handleShareGrievance = (grievance) => {
+    setShareableGrievance(grievance);
+    setIsShareModalOpen(true);
+  };
+
+  // Generate shareable content
+  const generateShareableContent = (grievance) => {
+    const content = `
+GRIEVANCE DETAILS - RAMPUR VILLAGE
+
+ID: ${grievance._id}
+Title: ${grievance.title}
+Category: ${grievance.category}
+Priority: ${grievance.priority}
+Status: ${grievance.progressStatus}
+Admin Status: ${grievance.adminStatus}
+Submitted By: ${grievance.submittedBy?.name || 'N/A'}
+Submitted On: ${new Date(grievance.createdAt).toLocaleDateString()}
+
+Description:
+${grievance.description}
+
+Location: ${grievance.location || 'Not specified'}
+
+Assigned Worker: ${grievance.assignedWorker?.name || 'Unassigned'}
+
+Photos: ${grievance.photos?.length || 0} submitted, ${grievance.resolutionPhotos?.length || 0} resolution photos
+
+---
+Shared from Rampur Village Grievance Management System
+    `.trim();
+    
+    return content;
+  };
+
+  // Copy to clipboard
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success(t({ 
+        en: 'Content copied to clipboard!', 
+        mr: 'सामग्री क्लिपबोर्डवर कॉपी केली!' 
+      }));
+    } catch (error) {
+      toast.error(t({ 
+        en: 'Failed to copy to clipboard', 
+        mr: 'क्लिपबोर्डवर कॉपी करण्यात अयशस्वी' 
+      }));
+    }
+  };
+
   const handleOpenEditModal = (villager) => {
     setEditingVillager(villager);
     setIsModalOpen(true);
@@ -2236,6 +2317,7 @@ function AdminPage() {
   const [villagerCurrentPage, setVillagerCurrentPage] = useState(1);
   const [selectedVillager, setSelectedVillager] = useState(null);
   const [isVillagerDetailOpen, setIsVillagerDetailOpen] = useState(false);
+  const [isVillagerImageViewOpen, setIsVillagerImageViewOpen] = useState(false);
   const [isAddVillagerOpen, setIsAddVillagerOpen] = useState(false);
   const [newVillager, setNewVillager] = useState({
     fullName: '',
@@ -3749,11 +3831,11 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 </p>
                           </div>
                           <div className="flex gap-2">
-                <Button onClick={handleOpenAddModal} className="bg-gray-800 hover:bg-gray-900 text-white">
+                <Button onClick={handleOpenAddModal} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-blue-100 shadow-lg hover:shadow-xl transition-all duration-300">
                     <Plus className="h-4 w-4 mr-2" />
                   {t({ en: 'Add Villager', mr: 'गावकरी जोडा' })}
                   </Button>
-                <Button onClick={handleExportCsv} variant="outline">
+                <Button onClick={handleExportCsv} className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-black shadow-lg hover:shadow-xl transition-all duration-300">
                   <Download className="h-4 w-4 mr-2" />
                   {t({ en: 'Export CSV', mr: 'CSV एक्सपोर्ट करा' })}
                             </Button>
@@ -3861,6 +3943,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                       <TableHead>{t({ en: 'Mobile', mr: 'मोबाइल' })}</TableHead>
                       <TableHead>{t({ en: 'Gender', mr: 'लिंग' })}</TableHead>
                       <TableHead>{t({ en: 'Aadhar', mr: 'आधार' })}</TableHead>
+                      <TableHead>{t({ en: 'ID Proof', mr: 'ओळख पुरावा' })}</TableHead>
                       <TableHead>{t({ en: 'Status', mr: 'स्थिती' })}</TableHead>
                       <TableHead>{t({ en: 'Request Type', mr: 'विनंती प्रकार' })}</TableHead>
                       <TableHead>{t({ en: 'Submitted At', mr: 'सबमिट केले' })}</TableHead>
@@ -3870,7 +3953,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                     <TableBody>
                     {villagers.length === 0 ? (
                         <TableRow>
-                        <TableCell colSpan={8} className="text-center py-12">
+                        <TableCell colSpan={9} className="text-center py-12">
                           <div className="text-gray-500">
                             <User className="h-12 w-12 mx-auto mb-4 opacity-50" />
                             <p>{t({ en: 'No villagers found', mr: 'कोणतेही गावकरी सापडले नाहीत' })}</p>
@@ -3884,6 +3967,23 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                           <TableCell>{villager.mobileNumber}</TableCell>
                           <TableCell>{villager.gender}</TableCell>
                           <TableCell>{villager.aadharNumber}</TableCell>
+                          <TableCell>
+                            {villager.idProofPhoto ? (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setSelectedVillagerImage(villager.idProofPhoto)}
+                                className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                              >
+                                <Eye className="h-4 w-4 mr-1" />
+                                {t({ en: 'View ID Proof', mr: 'ओळख पुरावा पहा' })}
+                              </Button>
+                            ) : (
+                              <span className="text-gray-500 text-sm">
+                                {t({ en: 'No image', mr: 'प्रतिमा नाही' })}
+                              </span>
+                            )}
+                          </TableCell>
                             <TableCell>
                             <Badge 
                               className={
@@ -3916,6 +4016,17 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                             </TableCell>
                           <TableCell className="text-right">
                             <div className="flex items-center justify-end gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedVillager(villager);
+                                    setIsVillagerDetailOpen(true);
+                                  }}
+                                  className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
                                 <Button
                                   variant="outline"
                                   size="sm"
@@ -4085,8 +4196,6 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
         </DialogContent>
       </Dialog>
 
-            {/* Floating Contracts Button */}
-            <AdminFloatingContractsButton />
           </TabsContent>
 
           {/* Other Tab Contents */}
@@ -4612,7 +4721,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                   </div>
 
                   <div className="flex justify-end">
-                    <Button onClick={handleSaveSiteSettings} className="bg-indigo-600 hover:bg-indigo-700">
+                    <Button onClick={handleSaveSiteSettings} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-indigo-700 hover:to-indigo-800 text-black shadow-lg hover:shadow-xl transition-all duration-300">
                       {t({ en: 'Save Settings', mr: 'सेटिंग्ज सेव्ह करा' })}
                     </Button>
                   </div>
@@ -4624,7 +4733,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <CardTitle>{t({ en: 'Manage Latest Developments', mr: 'अलीकडील विकास व्यवस्थापित करा' })}</CardTitle>
-                    <Button onClick={() => setIsAddLatestDevelopmentOpen(true)} className="bg-indigo-600 hover:bg-indigo-700">
+black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(true)} className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text- shadow-lg hover:shadow-xl transition-all duration-300">
                       <Plus className="h-4 w-4 mr-2" />
                       {t({ en: 'Add Latest Development', mr: 'अलीकडील विकास जोडा' })}
                     </Button>
@@ -4834,7 +4943,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                   {t({ en: 'Upload Tax Records', mr: 'कर रेकॉर्ड अपलोड करा' })}
                 </Button>
                 <Button 
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 text-color-black"
                   onClick={() => {
                     setEditingTaxRecord(null);
                     setIsTaxModalOpen(true);
@@ -5057,7 +5166,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                       </Button>
                       <Button
                         onClick={handleUploadSubmit}
-                        disabled={!selectedFile}
+                        disabled={!selectedFile} className="text-color-black"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         {t({ en: 'Upload', mr: 'अपलोड करा' })}
@@ -5175,7 +5284,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                                 <div className="flex gap-2">
                                   <Button 
                                     size="sm" 
-                                    variant="outline"
+                                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
                                     onClick={() => handleEditWorkerClick(worker)}
                                   >
                                     <Edit className="h-4 w-4 mr-1" />
@@ -5183,7 +5292,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                                   </Button>
                                   <Button 
                                     size="sm" 
-                                    variant="destructive"
+                                    className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
                                     onClick={() => handleDeleteWorker(worker._id)}
                                   >
                                     <Trash2 className="h-4 w-4 mr-1" />
@@ -5278,7 +5387,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                           <div className="flex gap-3 pt-4">
                             <Button 
                               type="submit" 
-                              className="bg-gray-800 hover:bg-gray-900 text-white flex-1"
+                              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-black flex-1 shadow-lg hover:shadow-xl transition-all duration-300"
                             >
                               {editingWorker 
                                 ? t({ en: 'Update Worker', mr: 'कामगार अद्यतनित करा' })
@@ -5287,7 +5396,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                             </Button>
                             <Button 
                               type="button"
-                              variant="outline" 
+                              className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
                               onClick={() => setIsWorkerModalOpen(false)}
                             >
                               {t({ en: 'Cancel', mr: 'रद्द करा' })}
@@ -5299,6 +5408,173 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                   </DialogContent>
                 </Dialog>
               </div>
+
+              {/* Workers List Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold">{t({ en: 'Active Workers Directory', mr: 'सक्रिय कामगार डायरेक्टरी' })}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {workers.filter(w => w.status === 'active').map((worker) => (
+                      <div key={worker._id} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-lg">{worker.name}</h4>
+                            <p className="text-sm text-gray-600 mb-2">{worker.department}</p>
+                            <div className="space-y-1 text-sm">
+                              {worker.phone && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-blue-600">📞</span>
+                                  <a 
+                                    href={`tel:${worker.phone}`}
+                                    className="text-blue-600 hover:underline"
+                                  >
+                                    {worker.phone}
+                                  </a>
+                                </div>
+                              )}
+                              {worker.email && (
+                                <div className="flex items-center gap-2">
+                                  <span className="text-blue-600">📧</span>
+                                  <a 
+                                    href={`mailto:${worker.email}`}
+                                    className="text-blue-600 hover:underline"
+                                  >
+                                    {worker.email}
+                                  </a>
+                                </div>
+                              )}
+                            </div>
+                            <div className="mt-2">
+                              <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                🟢 {t({ en: 'Active', mr: 'सक्रिय' })}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex flex-col gap-1">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => {
+                                if (worker.phone) {
+                                  window.open(`tel:${worker.phone}`, '_self');
+                                }
+                              }}
+                              disabled={!worker.phone}
+                              className="text-xs"
+                            >
+                              📞 {t({ en: 'Call', mr: 'कॉल करा' })}
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              onClick={() => {
+                                if (worker.email) {
+                                  window.open(`mailto:${worker.email}`, '_self');
+                                }
+                              }}
+                              disabled={!worker.email}
+                              className="text-xs"
+                            >
+                              📧 {t({ en: 'Email', mr: 'ईमेल करा' })}
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {workers.filter(w => w.status === 'active').length === 0 && (
+                      <div className="col-span-full text-center py-8 text-gray-500">
+                        <p>{t({ en: 'No active workers found', mr: 'कोणतेही सक्रिय कामगार सापडले नाहीत' })}</p>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Search and Filter Section */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-xl font-bold">{t({ en: 'Search & Filter Grievances', mr: 'तक्रारी शोधा आणि फिल्टर करा' })}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div>
+                      <Label htmlFor="grievanceSearch">{t({ en: 'Search', mr: 'शोधा' })}</Label>
+                      <Input
+                        id="grievanceSearch"
+                        placeholder={t({ en: 'Search by title, description, or ID...', mr: 'विषय, वर्णन किंवा आयडीने शोधा...' })}
+                        value={grievanceSearchTerm}
+                        onChange={(e) => setGrievanceSearchTerm(e.target.value)}
+                        className="w-full"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="statusFilter">{t({ en: 'Progress Status', mr: 'प्रगती स्थिती' })}</Label>
+                      <Select value={grievanceStatusFilter} onValueChange={setGrievanceStatusFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t({ en: 'All Statuses', mr: 'सर्व स्थिती' })} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">{t({ en: 'All Statuses', mr: 'सर्व स्थिती' })}</SelectItem>
+                          <SelectItem value="Pending">{t({ en: 'Pending', mr: 'प्रलंबित' })}</SelectItem>
+                          <SelectItem value="In-progress">{t({ en: 'In Progress', mr: 'प्रगतीपथावर' })}</SelectItem>
+                          <SelectItem value="Resolved">{t({ en: 'Resolved', mr: 'निराकरण झाले' })}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="adminStatusFilter">{t({ en: 'Admin Status', mr: 'व्यवस्थापक स्थिती' })}</Label>
+                      <Select value={grievanceAdminStatusFilter} onValueChange={setGrievanceAdminStatusFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t({ en: 'All Admin Statuses', mr: 'सर्व व्यवस्थापक स्थिती' })} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">{t({ en: 'All Admin Statuses', mr: 'सर्व व्यवस्थापक स्थिती' })}</SelectItem>
+                          <SelectItem value="Unapproved">{t({ en: 'Unapproved', mr: 'अनमंजूर' })}</SelectItem>
+                          <SelectItem value="Approved">{t({ en: 'Approved', mr: 'मंजूर' })}</SelectItem>
+                          <SelectItem value="Rejected">{t({ en: 'Rejected', mr: 'नाकारले' })}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <Label htmlFor="categoryFilter">{t({ en: 'Category', mr: 'श्रेणी' })}</Label>
+                      <Select value={grievanceCategoryFilter} onValueChange={setGrievanceCategoryFilter}>
+                        <SelectTrigger>
+                          <SelectValue placeholder={t({ en: 'All Categories', mr: 'सर्व श्रेणी' })} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="All">{t({ en: 'All Categories', mr: 'सर्व श्रेणी' })}</SelectItem>
+                          <SelectItem value="Infrastructure">{t({ en: 'Infrastructure', mr: 'पायाभूत सुविधा' })}</SelectItem>
+                          <SelectItem value="Water">{t({ en: 'Water', mr: 'पाणी' })}</SelectItem>
+                          <SelectItem value="Roads">{t({ en: 'Roads', mr: 'रस्ते' })}</SelectItem>
+                          <SelectItem value="Electricity">{t({ en: 'Electricity', mr: 'वीज' })}</SelectItem>
+                          <SelectItem value="Health">{t({ en: 'Health', mr: 'आरोग्य' })}</SelectItem>
+                          <SelectItem value="Education">{t({ en: 'Education', mr: 'शिक्षण' })}</SelectItem>
+                          <SelectItem value="Other">{t({ en: 'Other', mr: 'इतर' })}</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center mt-4">
+                    <div className="text-sm text-gray-600">
+                      {t({ en: `Showing ${filteredGrievances.length} of ${grievances.length} grievances`, mr: `${grievances.length} पैकी ${filteredGrievances.length} तक्रारी दाखवत आहे` })}
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setGrievanceSearchTerm('');
+                        setGrievanceStatusFilter('All');
+                        setGrievanceAdminStatusFilter('All');
+                        setGrievanceCategoryFilter('All');
+                      }}
+                    >
+                      {t({ en: 'Clear Filters', mr: 'फिल्टर साफ करा' })}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Grievances Table */}
               <Card>
@@ -5327,14 +5603,14 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {grievances.length === 0 ? (
+                          {filteredGrievances.length === 0 ? (
                             <TableRow>
                               <TableCell colSpan={9} className="text-center py-8 text-gray-500">
                                 {t({ en: 'No grievances found', mr: 'कोणत्याही तक्रारी नाही' })}
                               </TableCell>
                             </TableRow>
                           ) : (
-                            grievances.map((grievance) => (
+                            filteredGrievances.map((grievance) => (
                               <TableRow key={grievance._id}>
                                 <TableCell className="font-medium">{grievance._id.substring(0, 8)}...</TableCell>
                                 <TableCell className="max-w-xs truncate">{grievance.title}</TableCell>
@@ -5371,23 +5647,31 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                                   <div className="flex space-x-2">
                                     <Button 
                                       size="sm" 
-                                      variant="outline"
+                                      className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
                                       onClick={() => handleOpenDetailModal(grievance)}
                                     >
                                       {t({ en: 'View', mr: 'पहा' })}
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
+                                      onClick={() => handleShareGrievance(grievance)}
+                                    >
+                                      <Share2 className="h-4 w-4 mr-1" />
+                                      {t({ en: 'Share', mr: 'शेअर करा' })}
                                     </Button>
                                     {grievance.adminStatus === 'Unapproved' && (
                                       <>
                                         <Button 
                                           size="sm" 
-                                          style={{ backgroundColor: '#18d235', color: 'white' }}
+                                          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
                                           onClick={() => handleUpdateAdminStatus(grievance._id, 'Approved')}
                                         >
                                           {t({ en: 'Approve', mr: 'मंजूर' })}
                                         </Button>
                                         <Button 
                                           size="sm" 
-                                          variant="destructive"
+                                          className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
                                           onClick={() => handleUpdateAdminStatus(grievance._id, 'Rejected')}
                                         >
                                           {t({ en: 'Reject', mr: 'नकार' })}
@@ -5706,6 +5990,58 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 </div>
               </DialogContent>
             </Dialog>
+
+            {/* Share Grievance Modal */}
+            <Dialog open={isShareModalOpen} onOpenChange={setIsShareModalOpen}>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-bold">
+                    {t({ en: 'Share Grievance Details', mr: 'तक्रार तपशील शेअर करा' })}
+                  </DialogTitle>
+                  <DialogDescription>
+                    {t({ en: 'Copy the grievance details to share with others', mr: 'तक्रार तपशील इतरांसह शेअर करण्यासाठी कॉपी करा' })}
+                  </DialogDescription>
+                </DialogHeader>
+                
+                {shareableGrievance && (
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-semibold mb-2">{t({ en: 'Preview:', mr: 'पूर्वावलोकन:' })}</h4>
+                      <div className="bg-white p-3 rounded border max-h-60 overflow-y-auto">
+                        <pre className="text-sm whitespace-pre-wrap font-mono">
+                          {generateShareableContent(shareableGrievance)}
+                        </pre>
+                      </div>
+                    </div>
+                    
+                    <div className="flex gap-3">
+                      <Button
+                        onClick={() => copyToClipboard(generateShareableContent(shareableGrievance))}
+                        className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                      >
+                        <Share2 className="h-4 w-4 mr-2" />
+                        {t({ en: 'Copy to Clipboard', mr: 'क्लिपबोर्डवर कॉपी करा' })}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => setIsShareModalOpen(false)}
+                      >
+                        {t({ en: 'Close', mr: 'बंद करा' })}
+                      </Button>
+                    </div>
+                    
+                    <div className="text-xs text-gray-600 bg-blue-50 p-3 rounded">
+                      <p className="font-medium">{t({ en: 'How to use:', mr: 'कसे वापरायचे:' })}</p>
+                      <ul className="list-disc list-inside mt-1 space-y-1">
+                        <li>{t({ en: 'Click "Copy to Clipboard" to copy all details', mr: 'सर्व तपशील कॉपी करण्यासाठी "क्लिपबोर्डवर कॉपी करा" क्लिक करा' })}</li>
+                        <li>{t({ en: 'Paste the content in WhatsApp, Email, or any messaging app', mr: 'व्हॉट्सअॅप, ईमेल किंवा कोणत्याही मेसेजिंग ऍपमध्ये सामग्री पेस्ट करा' })}</li>
+                        <li>{t({ en: 'The recipient will see all grievance details without accessing admin panel', mr: 'प्राप्तकर्ता व्यवस्थापक पॅनेलमध्ये प्रवेश न करता सर्व तक्रार तपशील पाहू शकतो' })}</li>
+                      </ul>
+                    </div>
+                  </div>
+                )}
+              </DialogContent>
+            </Dialog>
           </TabsContent>
 
           <TabsContent value="committee">
@@ -5732,7 +6068,8 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="border-blue-600 text-blue-600 hover:bg-blue-50 px-6 py-3 text-sm font-medium shadow-md hover:shadow-lg transition-all duration-200"
+                      className="bg-teal-600 hover:bg-teal-700 text-black
+                       px-6 py-3 text-sm font-medium shadow-md hover:shadow-lg transition-all duration-200"
                       onClick={handleExportMembersCsv}
                     >
                       <Download className="h-4 w-4 mr-2" />
@@ -6586,7 +6923,13 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                         {mediaItems.map((item) => (
                           <TableRow key={item._id} className="hover:bg-gray-50">
                             <TableCell>
-                              <div className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100">
+                              <div 
+                                className="w-12 h-12 rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-80 transition-opacity"
+                                onClick={() => {
+                                  setViewerMedia(item);
+                                  setIsMediaViewerOpen(true);
+                                }}
+                              >
                                 {item.thumbnailUrl ? (
                                   <img 
                                     src={item.thumbnailUrl} 
@@ -6788,7 +7131,11 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                             </div>
                           </div>
                           <div className="flex gap-2 ml-4">
-                            <Button variant="outline" size="sm">
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={() => handleViewProjectDetails(tender)}
+                            >
                               <Eye className="h-4 w-4 mr-1" />
                               {t({ en: 'View', mr: 'पहा' })}
                             </Button>
@@ -6826,7 +7173,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">{t({ en: 'Ongoing Contracts', mr: 'चालू करार' })}</h3>
                     <Button 
-                      className="bg-orange-600 hover:bg-orange-700 text-white"
+                      className="bg-orange-600 hover:bg-orange-700 text-blue  "
                       onClick={() => handleOpenProjectAddModal('Ongoing')}
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -7606,7 +7953,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
               <Button variant="outline" onClick={() => setIsProjectModalOpen(false)}>
                 {t({ en: 'Cancel', mr: 'रद्द करा' })}
               </Button>
-              <Button onClick={handleProjectFormSubmit}>
+              <Button onClick={handleProjectFormSubmit} className="text-color-black">
                 {editingProject?._id 
                   ? t({ en: 'Update Project', mr: 'प्रकल्प अपडेट करा' })
                   : t({ en: 'Create Project', mr: 'प्रकल्प तयार करा' })
@@ -10348,7 +10695,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                   <Button
                     onClick={handleUpdateMedia}
                     disabled={!selectedMedia.title.en || !selectedMedia.category}
-                    className="bg-indigo-600 hover:bg-indigo-700"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-color-black"
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     {t({ en: 'Update Media', mr: 'मीडिया अपडेट करा' })}
@@ -10863,7 +11210,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
               <Button variant="outline" onClick={() => setIsEditLatestDevelopmentOpen(false)}>
                 {t({ en: 'Cancel', mr: 'रद्द करा' })}
               </Button>
-              <Button onClick={handleEditLatestDevelopment}>
+              <Button onClick={handleEditLatestDevelopment} className="text-color-black">
                 {t({ en: 'Update Development', mr: 'विकास अपडेट करा' })}
               </Button>
             </DialogFooter>
@@ -11025,7 +11372,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
               <Button variant="outline" onClick={() => setIsEditFacilityOpen(false)}>
                 {t({ en: 'Cancel', mr: 'रद्द करा' })}
               </Button>
-              <Button onClick={handleEditFacility}>
+              <Button onClick={handleEditFacility} className="text-color-black">
                 {t({ en: 'Update Facility', mr: 'सुविधा अपडेट करा' })}
               </Button>
             </DialogFooter>
@@ -11105,7 +11452,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
               <Button variant="outline" onClick={() => setIsAddAchievementOpen(false)}>
                 {t({ en: 'Cancel', mr: 'रद्द करा' })}
               </Button>
-              <Button onClick={handleAddAchievement}>
+              <Button onClick={handleAddAchievement} className="text-color-black">
                 {t({ en: 'Add Achievement', mr: 'यशस्वीता जोडा' })}
               </Button>
             </DialogFooter>
@@ -11187,7 +11534,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
               <Button variant="outline" onClick={() => setIsEditAchievementOpen(false)}>
                 {t({ en: 'Cancel', mr: 'रद्द करा' })}
               </Button>
-              <Button onClick={handleEditAchievement}>
+              <Button onClick={handleEditAchievement} className="text-color-black">
                 {t({ en: 'Update Achievement', mr: 'यशस्वीता अपडेट करा' })}
               </Button>
             </DialogFooter>
@@ -11418,6 +11765,415 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 {t({ en: 'Close', mr: 'बंद करा' })}
               </Button>
             </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Villager ID Proof Image Modal */}
+        <Dialog open={selectedVillagerImage !== null} onOpenChange={() => setSelectedVillagerImage(null)}>
+          <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="text-xl font-bold">
+                {t({ en: 'ID Proof Document', mr: 'ओळख पुरावा दस्तऐवज' })}
+              </DialogTitle>
+              <DialogDescription>
+                {t({ en: 'Review the identity proof document before approval', mr: 'मंजुरीपूर्वी ओळख पुरावा दस्तऐवज तपासा' })}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
+              {selectedVillagerImage && (
+                <div className="relative w-full flex items-center justify-center">
+                  {selectedVillagerImage.includes('http') ? (
+                    <img
+                      src={selectedVillagerImage}
+                      alt="ID Proof Document"
+                      className="max-w-full max-h-full object-contain rounded-lg shadow-lg border"
+                      onError={(e) => {
+                        console.error('Image failed to load:', selectedVillagerImage);
+                        console.error('Error event:', e);
+                      }}
+                      onLoad={() => {
+                        console.log('Image loaded successfully:', selectedVillagerImage);
+                      }}
+                    />
+                  ) : (
+                    <div className="text-center p-8">
+                      <div className="text-gray-500 mb-4">
+                        <svg className="w-16 h-16 mx-auto mb-4" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M4 3a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V5a2 2 0 00-2-2H4zm12 12H4l4-8 3 6 2-4 3 6z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                      <p className="text-gray-600 mb-2">Image not available</p>
+                      <p className="text-sm text-gray-500">Filename: {selectedVillagerImage}</p>
+                      <p className="text-xs text-gray-400 mt-2">This appears to be a filename rather than a valid image URL</p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-4 border-t flex-shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setSelectedVillagerImage(null)}
+                className="border-gray-500 text-gray-500 hover:bg-gray-50"
+              >
+                {t({ en: 'Close', mr: 'बंद करा' })}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Villager Detail Modal */}
+        <Dialog open={isVillagerDetailOpen} onOpenChange={setIsVillagerDetailOpen}>
+          <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="text-xl font-bold">
+                {t({ en: 'Villager Details', mr: 'गावकरी तपशील' })}
+              </DialogTitle>
+              <DialogDescription>
+                {t({ en: 'Complete information about the villager', mr: 'गावकऱ्याबद्दल संपूर्ण माहिती' })}
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedVillager && (
+              <div className="flex-1 overflow-y-auto p-4 space-y-6">
+                {/* Personal Information */}
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="font-semibold text-gray-700">{t({ en: 'Full Name', mr: 'पूर्ण नाव' })}</Label>
+                      <p className="text-lg font-medium">{selectedVillager.fullName}</p>
+                    </div>
+                    
+                    <div>
+                      <Label className="font-semibold text-gray-700">{t({ en: 'Mobile Number', mr: 'मोबाइल नंबर' })}</Label>
+                      <p className="text-lg">{selectedVillager.mobileNumber}</p>
+                    </div>
+                    
+                    <div>
+                      <Label className="font-semibold text-gray-700">{t({ en: 'Gender', mr: 'लिंग' })}</Label>
+                      <p className="text-lg">{selectedVillager.gender}</p>
+                    </div>
+                    
+                    <div>
+                      <Label className="font-semibold text-gray-700">{t({ en: 'Date of Birth', mr: 'जन्मतारीख' })}</Label>
+                      <p className="text-lg">
+                        {selectedVillager.dateOfBirth ? 
+                          new Date(selectedVillager.dateOfBirth).toLocaleDateString() : 
+                          t({ en: 'Not provided', mr: 'प्रदान केले नाही' })
+                        }
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div>
+                      <Label className="font-semibold text-gray-700">{t({ en: 'Aadhar Number', mr: 'आधार नंबर' })}</Label>
+                      <p className="text-lg font-mono">{selectedVillager.aadharNumber}</p>
+                    </div>
+                    
+                    <div>
+                      <Label className="font-semibold text-gray-700">{t({ en: 'Status', mr: 'स्थिती' })}</Label>
+                      <Badge 
+                        className={
+                          selectedVillager.status === 'Approved' ? 'bg-green-100 text-green-800' :
+                          selectedVillager.status === 'Rejected' ? 'bg-red-100 text-red-800' :
+                          'bg-yellow-100 text-yellow-800'
+                        }
+                      >
+                        {selectedVillager.status === 'Approved' && <CheckCircle className="h-3 w-3 mr-1" />}
+                        {selectedVillager.status === 'Rejected' && <XCircle className="h-3 w-3 mr-1" />}
+                        {selectedVillager.status === 'Pending' && <Clock className="h-3 w-3 mr-1" />}
+                        {t({ 
+                          en: selectedVillager.status, 
+                          mr: selectedVillager.status === 'Approved' ? 'मंजूर' : 
+                              selectedVillager.status === 'Rejected' ? 'नाकारले' : 'प्रलंबित' 
+                        })}
+                      </Badge>
+                    </div>
+                    
+                    <div>
+                      <Label className="font-semibold text-gray-700">{t({ en: 'Request Type', mr: 'विनंती प्रकार' })}</Label>
+                      <Badge variant="outline">
+                        {t({ 
+                          en: selectedVillager.requestType, 
+                          mr: selectedVillager.requestType === 'New Registration' ? 'नवीन नोंदणी' :
+                              selectedVillager.requestType === 'Edit Request' ? 'संपादन विनंती' : 'प्रशासक जोडले' 
+                        })}
+                      </Badge>
+                    </div>
+                    
+                    <div>
+                      <Label className="font-semibold text-gray-700">{t({ en: 'Submitted Date', mr: 'सबमिट दिनांक' })}</Label>
+                      <p className="text-lg">
+                        {new Date(selectedVillager.submittedAt).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Address */}
+                <div>
+                  <Label className="font-semibold text-gray-700">{t({ en: 'Address', mr: 'पत्ता' })}</Label>
+                  <p className="text-lg mt-2 p-4 bg-gray-50 rounded-lg border">
+                    {selectedVillager.address}
+                  </p>
+                </div>
+
+                {/* ID Proof Photo */}
+                {selectedVillager.idProofPhoto && (
+                  <div>
+                    <Label className="font-semibold text-gray-700">{t({ en: 'ID Proof Document', mr: 'ओळख पुरावा दस्तऐवज' })}</Label>
+                    <div className="mt-4 flex items-center gap-4">
+                      <div className="relative">
+                        <img
+                          src={selectedVillager.idProofPhoto}
+                          alt="ID Proof Document"
+                          className="w-32 h-32 object-cover rounded-lg border shadow-md cursor-pointer hover:shadow-lg transition-shadow"
+                          onClick={() => {
+                            setSelectedVillagerImage(selectedVillager.idProofPhoto);
+                            setIsVillagerImageViewOpen(true);
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 hover:bg-opacity-20 transition-all rounded-lg flex items-center justify-center">
+                          <Eye className="h-8 w-8 text-white opacity-0 hover:opacity-100 transition-opacity" />
+                        </div>
+                      </div>
+                      <div>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedVillagerImage(selectedVillager.idProofPhoto);
+                            setIsVillagerImageViewOpen(true);
+                          }}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          {t({ en: 'View Full Size', mr: 'पूर्ण आकारात पहा' })}
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
+            <DialogFooter className="flex-shrink-0">
+              <Button variant="outline" onClick={() => setIsVillagerDetailOpen(false)}>
+                {t({ en: 'Close', mr: 'बंद करा' })}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Villager Image View Modal */}
+        <Dialog open={isVillagerImageViewOpen} onOpenChange={setIsVillagerImageViewOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="text-xl font-bold">
+                {t({ en: 'ID Proof Document', mr: 'ओळख पुरावा दस्तऐवज' })}
+              </DialogTitle>
+              <DialogDescription>
+                {t({ en: 'Full view of the identity proof document', mr: 'ओळख पुरावा दस्तऐवजाचा पूर्ण दृश्य' })}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 flex items-center justify-center p-4 overflow-y-auto">
+              {selectedVillagerImage && (
+                <div className="relative w-full flex items-center justify-center">
+                  <img
+                    src={selectedVillagerImage}
+                    alt="ID Proof Document"
+                    className="max-w-full max-h-full object-contain rounded-lg shadow-lg border"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-4 border-t flex-shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setIsVillagerImageViewOpen(false)}
+              >
+                {t({ en: 'Close', mr: 'बंद करा' })}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Media Viewer Modal */}
+        <Dialog open={isMediaViewerOpen} onOpenChange={setIsMediaViewerOpen}>
+          <DialogContent className="max-w-6xl max-h-[90vh] flex flex-col">
+            <DialogHeader className="flex-shrink-0">
+              <DialogTitle className="text-xl font-bold">
+                {viewerMedia?.title?.en || t({ en: 'Media Viewer', mr: 'मीडिया दर्शक' })}
+              </DialogTitle>
+              <DialogDescription>
+                {viewerMedia?.description?.en || t({ en: 'View media details and information', mr: 'मीडिया तपशील आणि माहिती पहा' })}
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="flex-1 flex flex-col lg:flex-row gap-6 p-4 overflow-y-auto">
+              {/* Media Display */}
+              <div className="flex-1 flex items-center justify-center bg-gray-50 rounded-lg p-4">
+                {viewerMedia && (
+                  <div className="w-full h-full flex items-center justify-center">
+                    {viewerMedia.mediaType === 'Photo' ? (
+                      <img
+                        src={viewerMedia.fileUrl || viewerMedia.thumbnailUrl}
+                        alt={viewerMedia.title.en}
+                        className="max-w-full max-h-full object-contain rounded-lg shadow-lg"
+                        onError={(e) => {
+                          e.target.src = 'https://images.unsplash.com/photo-1606107557195-0e29a4b5b4aa?w=800&h=600&fit=crop';
+                        }}
+                      />
+                    ) : (
+                      <video
+                        src={viewerMedia.fileUrl}
+                        controls
+                        className="max-w-full max-h-full rounded-lg shadow-lg"
+                        poster={viewerMedia.thumbnailUrl}
+                      >
+                        Your browser does not support the video tag.
+                      </video>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Media Information */}
+              <div className="lg:w-80 space-y-4">
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h3 className="font-semibold text-lg mb-3">{t({ en: 'Media Information', mr: 'मीडिया माहिती' })}</h3>
+                  
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">{t({ en: 'Title (English)', mr: 'शीर्षक (इंग्रजी)' })}</label>
+                      <p className="text-gray-900">{viewerMedia?.title?.en || 'N/A'}</p>
+                    </div>
+                    
+                    {viewerMedia?.title?.mr && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">{t({ en: 'Title (Marathi)', mr: 'शीर्षक (मराठी)' })}</label>
+                        <p className="text-gray-900">{viewerMedia.title.mr}</p>
+                      </div>
+                    )}
+
+                    {viewerMedia?.description?.en && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">{t({ en: 'Description (English)', mr: 'वर्णन (इंग्रजी)' })}</label>
+                        <p className="text-gray-900 text-sm">{viewerMedia.description.en}</p>
+                      </div>
+                    )}
+
+                    {viewerMedia?.description?.mr && (
+                      <div>
+                        <label className="text-sm font-medium text-gray-600">{t({ en: 'Description (Marathi)', mr: 'वर्णन (मराठी)' })}</label>
+                        <p className="text-gray-900 text-sm">{viewerMedia.description.mr}</p>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">{t({ en: 'Media Type', mr: 'मीडिया प्रकार' })}</label>
+                      <div className="mt-1">
+                        <Badge variant={viewerMedia?.mediaType === 'Photo' ? 'secondary' : 'default'}>
+                          {viewerMedia?.mediaType || 'N/A'}
+                        </Badge>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">{t({ en: 'Category', mr: 'श्रेणी' })}</label>
+                      <p className="text-gray-900">{viewerMedia?.category?.name?.en || 'Uncategorized'}</p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">{t({ en: 'Upload Date', mr: 'अपलोड तारीख' })}</label>
+                      <p className="text-gray-900">
+                        {viewerMedia?.createdAt ? new Date(viewerMedia.createdAt).toLocaleDateString() : 'N/A'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">{t({ en: 'Views', mr: 'दृश्ये' })}</label>
+                      <div className="flex items-center gap-1">
+                        <Eye className="h-4 w-4 text-gray-500" />
+                        <span className="text-gray-900">{viewerMedia?.views || 0}</span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-sm font-medium text-gray-600">{t({ en: 'Likes', mr: 'लाइक्स' })}</label>
+                      <div className="flex items-center gap-1">
+                        <Heart className="h-4 w-4 text-gray-500" />
+                        <span className="text-gray-900">{viewerMedia?.likes || 0}</span>
+                      </div>
+                    </div>
+
+                    {viewerMedia?.isFeatured && (
+                      <div>
+                        <Badge variant="outline" className="border-purple-200 text-purple-700">
+                          {t({ en: 'Featured', mr: 'विशेष' })}
+                        </Badge>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="bg-white rounded-lg p-4 shadow-sm">
+                  <h3 className="font-semibold text-lg mb-3">{t({ en: 'Actions', mr: 'क्रिया' })}</h3>
+                  
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => window.open(viewerMedia?.fileUrl, '_blank')}
+                    >
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                      {t({ en: 'Open in New Tab', mr: 'नवीन टॅबमध्ये उघडा' })}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        const link = document.createElement('a');
+                        link.href = viewerMedia?.fileUrl;
+                        link.download = viewerMedia?.title?.en || 'media';
+                        link.click();
+                      }}
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      {t({ en: 'Download', mr: 'डाउनलोड करा' })}
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start"
+                      onClick={() => {
+                        setSelectedMedia(viewerMedia);
+                        setIsEditMediaOpen(true);
+                        setIsMediaViewerOpen(false);
+                      }}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      {t({ en: 'Edit Media', mr: 'मीडिया संपादित करा' })}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end pt-4 border-t flex-shrink-0">
+              <Button
+                variant="outline"
+                onClick={() => setIsMediaViewerOpen(false)}
+              >
+                {t({ en: 'Close', mr: 'बंद करा' })}
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>

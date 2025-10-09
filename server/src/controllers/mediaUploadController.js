@@ -3,11 +3,20 @@ const multer = require('multer');
 const path = require('path');
 
 // Configure Cloudinary
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET
-});
+const cloudinaryConfigured = process.env.CLOUDINARY_CLOUD_NAME && 
+                            process.env.CLOUDINARY_API_KEY && 
+                            process.env.CLOUDINARY_API_SECRET;
+
+if (cloudinaryConfigured) {
+  cloudinary.config({
+    cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+    api_key: process.env.CLOUDINARY_API_KEY,
+    api_secret: process.env.CLOUDINARY_API_SECRET
+  });
+  console.log('✅ Cloudinary configured successfully');
+} else {
+  console.warn('⚠️ Cloudinary not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables.');
+}
 
 // Configure multer for memory storage
 const storage = multer.memoryStorage();
@@ -40,6 +49,26 @@ const uploadMedia = async (req, res) => {
       });
     }
 
+    // Check if Cloudinary is configured
+    if (!cloudinaryConfigured) {
+      // Return a mock URL for development/testing
+      const mockUrl = `https://via.placeholder.com/400x300/cccccc/666666?text=${encodeURIComponent(req.file.originalname)}`;
+      return res.json({
+        success: true,
+        data: {
+          fileUrl: mockUrl,
+          thumbnailUrl: mockUrl,
+          publicId: `mock_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          resourceType: req.file.mimetype.startsWith('video/') ? 'video' : 'image',
+          format: req.file.mimetype.split('/')[1] || 'jpg',
+          width: 400,
+          height: 300,
+          duration: null,
+          size: req.file.size
+        }
+      });
+    }
+
     // Determine resource type based on file mimetype
     const resourceType = req.file.mimetype.startsWith('video/') ? 'video' : 'image';
     
@@ -47,7 +76,7 @@ const uploadMedia = async (req, res) => {
     const result = await new Promise((resolve, reject) => {
       const uploadOptions = {
         resource_type: resourceType,
-        folder: 'village-portal/media',
+        folder: req.body.folder || 'village-portal/media',
         use_filename: true,
         unique_filename: true,
         overwrite: false

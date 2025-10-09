@@ -30,78 +30,42 @@ interface VillagerDashboardProps {
 export function VillagerDashboard({ userProfile }: VillagerDashboardProps) {
   const { t } = useLanguage();
 
-  const mockProfile = {
-    name: 'राहुल शर्मा / Rahul Sharma',
-    mobile: '+91 98765 43210',
-    villageId: 'VID001234',
-    familyMembers: 4,
-    registrationDate: '2023-01-15',
-    lastUpdated: '2024-01-10'
+  const profile = userProfile || {
+    name: '',
+    mobile: '',
+    villageId: '',
+    familyMembers: 0,
+    registrationDate: '',
+    lastUpdated: ''
   };
 
-  const profile = userProfile || mockProfile;
+  // Applications will be fetched from API
+  const [applications, setApplications] = useState([]);
 
-  const applications = [
-    {
-      id: 'APP001',
-      type: { en: 'Birth Certificate', mr: 'जन्म प्रमाणपत्र' },
-      date: '2024-01-10',
-      status: 'in-progress' as const,
-      progress: 60
-    },
-    {
-      id: 'APP002', 
-      type: { en: 'Income Certificate', mr: 'उत्पन्न प्रमाणपत्र' },
-      date: '2024-01-05',
-      status: 'approved' as const,
-      progress: 100
-    },
-    {
-      id: 'APP003',
-      type: { en: 'Caste Certificate', mr: 'जाती प्रमाणपत्र' },
-      date: '2023-12-20',
-      status: 'pending' as const,
-      progress: 25
-    }
-  ];
+  // Notifications will be fetched from API
+  const [notifications, setNotifications] = useState([]);
 
-  const notifications = [
-    {
-      id: 1,
-      title: { en: 'Tax Payment Due', mr: 'कर भरणे बाकी आहे' },
-      message: { en: 'Property tax payment is due by Jan 31, 2024', mr: 'मालमत्ता कर ३१ जानेवारी २०२४ पर्यंत भरावा लागेल' },
-      type: 'warning' as const,
-      date: '2024-01-15'
-    },
-    {
-      id: 2,
-      title: { en: 'Application Approved', mr: 'अर्ज मंजूर झाला' },
-      message: { en: 'Your income certificate application has been approved', mr: 'तुमचा उत्पन्न प्रमाणपत्र अर्ज मंजूर झाला आहे' },
-      type: 'success' as const,
-      date: '2024-01-12'
-    }
-  ];
-
-  const quickStats = [
+  // Quick stats will be calculated from actual data
+  const [quickStats, setQuickStats] = useState([
     {
       icon: FileText,
       label: { en: 'Active Applications', mr: 'सक्रिय अर्ज' },
-      value: '3',
+      value: '0',
       color: 'text-brand'
     },
     {
       icon: CheckCircle,
       label: { en: 'Completed', mr: 'पूर्ण झालेले' },
-      value: '7',
+      value: '0',
       color: 'text-primary'
     },
     {
       icon: Clock,
       label: { en: 'Pending', mr: 'प्रलंबित' },
-      value: '2',
-      color: 'text-amber-600'
+      value: '0',
+      color: 'text-primary'
     }
-  ];
+  ]);
 
   return (
     <div className="min-h-screen bg-muted/30 p-4">
@@ -191,7 +155,7 @@ export function VillagerDashboard({ userProfile }: VillagerDashboardProps) {
                   <div key={notification.id} className="p-3 rounded-lg border bg-card">
                     <div className="flex items-start gap-3">
                       {notification.type === 'warning' ? (
-                        <AlertCircle className="h-5 w-5 text-amber-500 mt-0.5" />
+                        <AlertCircle className="h-5 w-5 text-primary mt-0.5" />
                       ) : (
                         <CheckCircle className="h-5 w-5 text-primary mt-0.5" />
                       )}
@@ -278,28 +242,28 @@ export function VillagerDashboard({ userProfile }: VillagerDashboardProps) {
               </CardHeader>
               <CardContent>
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="p-4 rounded-lg bg-amber-50 border border-amber-200">
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                     <div className="flex items-center gap-2 mb-2">
-                      <AlertCircle className="h-5 w-5 text-amber-600" />
-                      <h3 className="font-semibold text-amber-800">
+                      <AlertCircle className="h-5 w-5 text-primary" />
+                      <h3 className="font-semibold text-primary">
                         {t({ en: 'Due Payment', mr: 'देय पेमेंट' })}
                       </h3>
                     </div>
-                    <p className="text-2xl font-bold text-amber-800">₹2,500</p>
-                    <p className="text-sm text-amber-700">
+                    <p className="text-2xl font-bold text-primary">₹2,500</p>
+                    <p className="text-sm text-primary/80">
                       {t({ en: 'Due by Jan 31, 2024', mr: '३१ जानेवारी २०२४ पर्यंत' })}
                     </p>
                   </div>
                   
-                  <div className="p-4 rounded-lg bg-green-50 border border-green-200">
+                  <div className="p-4 rounded-lg bg-primary/5 border border-primary/20">
                     <div className="flex items-center gap-2 mb-2">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                      <h3 className="font-semibold text-green-800">
+                      <CheckCircle className="h-5 w-5 text-primary" />
+                      <h3 className="font-semibold text-primary">
                         {t({ en: 'Last Payment', mr: 'शेवटचे पेमेंट' })}
                       </h3>
                     </div>
-                    <p className="text-2xl font-bold text-green-800">₹2,500</p>
-                    <p className="text-sm text-green-700">
+                    <p className="text-2xl font-bold text-primary">₹2,500</p>
+                    <p className="text-sm text-primary/80">
                       {t({ en: 'Paid on Dec 15, 2023', mr: '१५ डिसेंबर २०२३ रोजी भरले' })}
                     </p>
                   </div>

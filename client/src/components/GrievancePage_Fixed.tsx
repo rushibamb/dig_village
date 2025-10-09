@@ -23,35 +23,8 @@ export function GrievancePage() {
     setShowNewGrievanceForm(true);
   };
 
-  const grievances = [
-    {
-      id: 'GRV001',
-      title: { en: 'Street Light Not Working', mr: 'रस्ता दिवा काम करत नाही' },
-      category: { en: 'Infrastructure', mr: 'पायाभूत सुविधा' },
-      description: { en: 'The street light near temple is not working since 3 days', mr: 'मंदिराजवळील रस्ता दिवा ३ दिवसांपासून काम करत नाही' },
-      status: 'in-progress',
-      date: '10 Jan 2024',
-      response: { en: 'We have forwarded your complaint to electricity department', mr: 'आम्ही तुमची तक्रार वीज विभागाकडे पाठवली आहे' }
-    },
-    {
-      id: 'GRV002',
-      title: { en: 'Water Supply Issue', mr: 'पाणीपुरवठ्याची समस्या' },
-      category: { en: 'Water', mr: 'पाणी' },
-      description: { en: 'Irregular water supply in ward 3', mr: 'वार्ड ३ मध्ये अनियमित पाणीपुरवठा' },
-      status: 'resolved',
-      date: '5 Jan 2024',
-      response: { en: 'Issue has been resolved. New water connection installed', mr: 'समस्येचे निराकरण झाले आहे. नवीन पाणी कनेक्शन बसवले आहे' }
-    },
-    {
-      id: 'GRV003',
-      title: { en: 'Road Repair Needed', mr: 'रस्ता दुरुस्तीची गरज' },
-      category: { en: 'Roads', mr: 'रस्ते' },
-      description: { en: 'Main road has potholes causing inconvenience', mr: 'मुख्य रस्त्यावर खड्डे असल्यामुळे अडचण होत आहे' },
-      status: 'pending',
-      date: '8 Jan 2024',
-      response: null
-    }
-  ];
+  // Grievances will be fetched from API
+  const [grievances, setGrievances] = useState([]);
 
   const categories = [
     { en: 'Infrastructure', mr: 'पायाभूत सुविधा' },
@@ -65,9 +38,9 @@ export function GrievancePage() {
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'pending': return 'bg-yellow-500 text-white';
-      case 'in-progress': return 'bg-blue-500 text-white';
-      case 'resolved': return 'bg-green-500 text-white';
+      case 'pending': return 'bg-primary text-primary-foreground';
+      case 'in-progress': return 'bg-primary text-primary-foreground';
+      case 'resolved': return 'bg-primary text-primary-foreground';
       default: return 'bg-gray-500 text-white';
     }
   };
@@ -82,7 +55,7 @@ export function GrievancePage() {
   };
 
   return (
-    <div className="min-h-screen bg-purple-50 p-4">
+    <div className="min-h-screen bg-muted/30 p-4">
       <div className="container mx-auto max-w-6xl">
         {/* Header */}
         <div className="text-center mb-8">
@@ -114,7 +87,7 @@ export function GrievancePage() {
                   </div>
                   <Button 
                     onClick={handleNewGrievance}
-                    className="bg-white text-purple-600 hover:bg-gray-100"
+                    className="bg-white text-primary hover:bg-gray-100"
                   >
                     <Plus className="h-4 w-4 mr-2" />
                     {t({ en: 'New Grievance', mr: 'नवीन तक्रार' })}
@@ -132,10 +105,10 @@ export function GrievancePage() {
                       <AlertTriangle className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-bold text-purple-700 mb-1">
+                      <h3 className="font-bold text-primary mb-1">
                         {t({ en: 'Login Required', mr: 'लॉगिन आवश्यक' })}
                       </h3>
-                      <p className="text-purple-600 text-sm mb-3">
+                      <p className="text-primary text-sm mb-3">
                         {t({ 
                           en: 'You need to login to submit grievances and track their status. Please login to access all features.',
                           mr: 'तक्रारी सबमिट करण्यासाठी आणि त्यांची स्थिती पाहण्यासाठी तुम्हाला लॉगिन करावे लागेल. सर्व वैशिष्ट्ये वापरण्यासाठी कृपया लॉगिन करा.'
@@ -331,15 +304,15 @@ export function GrievancePage() {
                   </div>
                   <div className="flex justify-between">
                     <span>{t({ en: 'Resolved', mr: 'निराकरण झालेल्या' })}</span>
-                    <span className="font-bold text-green-600">142</span>
+                    <span className="font-bold text-primary">142</span>
                   </div>
                   <div className="flex justify-between">
                     <span>{t({ en: 'In Progress', mr: 'प्रगतीपथावर' })}</span>
-                    <span className="font-bold text-blue-600">8</span>
+                    <span className="font-bold text-primary">8</span>
                   </div>
                   <div className="flex justify-between">
                     <span>{t({ en: 'Pending', mr: 'प्रलंबित' })}</span>
-                    <span className="font-bold text-yellow-600">6</span>
+                    <span className="font-bold text-primary">6</span>
                   </div>
                 </div>
               </CardContent>

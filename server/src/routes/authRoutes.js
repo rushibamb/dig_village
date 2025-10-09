@@ -1,5 +1,5 @@
 const express = require('express');
-const { registerUser, loginUser, getMe, createAdminUser } = require('../controllers/authController');
+const { registerUser, loginUser, getMe, createAdminUser, forgotPassword, resetPassword } = require('../controllers/authController');
 const { protect } = require('../middleware/authMiddleware');
 
 const router = express.Router();
@@ -23,6 +23,16 @@ router.get('/me', protect, getMe);
 // @desc    Create admin user (for development/testing)
 // @access  Public (for development only)
 router.post('/create-admin', createAdminUser);
+
+// @route   POST /api/auth/forgot-password
+// @desc    Send OTP for password reset
+// @access  Public
+router.post('/forgot-password', forgotPassword);
+
+// @route   POST /api/auth/reset-password
+// @desc    Reset password with OTP verification
+// @access  Public
+router.post('/reset-password', resetPassword);
 
 module.exports = router;
 

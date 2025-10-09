@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -612,14 +612,12 @@ export function AuthenticationPage({ onNavigate }: AuthenticationPageProps) {
               </div>
 
               <div className="text-right">
-                <Button
-                  type="button"
-                  variant="link"
-                  onClick={() => navigateToMode('forgot-password')}
-                  className="text-primary hover:text-primary/80 p-0 h-auto text-sm"
+                <Link
+                  to="/forgot-password"
+                  className="text-primary hover:text-primary/80 text-sm font-medium"
                 >
                   {t({ en: 'Forgot Password?', mr: 'पासवर्ड विसरलात?' })}
-                </Button>
+                </Link>
               </div>
               
               <Button 

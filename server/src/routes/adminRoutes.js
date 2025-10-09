@@ -131,7 +131,8 @@ const {
   getAllTaxRecords,
   updateTaxRecord,
   deleteTaxRecord,
-  markAsPaid
+  markTaxRecordAsPaid,
+  getTaxStats
 } = require('../controllers/taxAdminController');
 
 // Import multer for file uploads
@@ -665,12 +666,37 @@ router.delete('/taxes/:id', protect, admin, deleteTaxRecord);
 // @route   PATCH /api/admin/taxes/:id/mark-paid
 // @desc    Admin: Mark tax record as paid (for offline payments)
 // @access  Private/Admin
-router.patch('/taxes/:id/mark-paid', protect, admin, markAsPaid);
+router.patch('/taxes/:id/mark-paid', protect, admin, markTaxRecordAsPaid);
+
+// @route   GET /api/admin/taxes/upload/test
+// @desc    Test endpoint to verify server is working
+// @access  Private/Admin
+router.get('/taxes/upload/test', protect, admin, (req, res) => {
+  res.json({ success: true, message: 'Tax upload endpoint is working' });
+});
 
 // @route   POST /api/admin/taxes/upload
 // @desc    Admin: Upload tax records via CSV file
 // @access  Private/Admin
-router.post('/taxes/upload', protect, admin, csvUpload.single('file'), uploadTaxRecordsCsv);
+router.post('/taxes/upload', protect, admin, (req, res, next) => {
+  console.log('=== Multer Middleware Debug ===');
+  console.log('Request headers:', req.headers);
+  console.log('Content-Type:', req.headers['content-type']);
+  console.log('Request body keys:', Object.keys(req.body || {}));
+  console.log('Request file before multer:', req.file);
+  
+  csvUpload.single('file')(req, res, (err) => {
+    if (err) {
+      console.error('Multer error:', err);
+      return res.status(400).json({
+        success: false,
+        message: 'File upload error: ' + err.message
+      });
+    }
+    console.log('Multer success, file:', req.file);
+    next();
+  });
+}, uploadTaxRecordsCsv);
 
 module.exports = router;
 

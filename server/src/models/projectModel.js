@@ -85,13 +85,15 @@ const projectSchema = new mongoose.Schema({
     type: bilingualSchema,
     required: function() {
       return this.status === 'Tender';
-    }
+    },
+    default: undefined
   },
   tenderNoticeUrl: {
     type: String,
     required: function() {
       return this.status === 'Tender';
-    }
+    },
+    default: undefined
   },
 
   // Ongoing Phase Fields

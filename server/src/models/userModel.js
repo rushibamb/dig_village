@@ -17,6 +17,14 @@ const userSchema = new mongoose.Schema({
   role: {
     type: String,
     default: 'villager'
+  },
+  resetPasswordOtp: {
+    type: String,
+    required: false
+  },
+  resetPasswordOtpExpiry: {
+    type: Date,
+    required: false
   }
 }, {
   timestamps: true

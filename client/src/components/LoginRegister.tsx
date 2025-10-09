@@ -129,7 +129,7 @@ export function LoginRegister({ isOpen, onClose, onSuccess }: LoginRegisterProps
               const userType = loginForm.email.includes('admin') ? 'admin' : 'villager';
               onSuccess(userType);
             } else {
-              navigate('/dashboard');
+              navigate('/');
             }
             onClose();
           }
@@ -178,7 +178,7 @@ export function LoginRegister({ isOpen, onClose, onSuccess }: LoginRegisterProps
           if (onSuccess) {
             onSuccess('villager');
           } else {
-            navigate('/dashboard');
+            navigate('/');
           }
           onClose();
         }

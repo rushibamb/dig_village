@@ -447,9 +447,10 @@ export function ContractsPage() {
               <Card key={contract.id} className="border-0 shadow-xl glass-effect hover-lift animate-scale-in" style={{ animationDelay: `${index * 0.1}s` }}>
                 <div className="relative">
                   <ImageWithFallback
-                    src={contract.finalPhotos?.[0] || contract.finalPhoto}
+                    src={contract.finalPhotos?.[0] || contract.finalPhoto || contract.sitePhotos?.[0] || '/api/placeholder/400/200'}
                     alt={t(contract.title)}
                     className="w-full h-48 object-cover rounded-t-lg"
+                    fallbackSrc="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=400&h=200&fit=crop"
                   />
                   <div className="absolute top-4 left-4">
                     <Badge className="bg-blue-500 text-white">
@@ -612,7 +613,7 @@ export function ContractsPage() {
 
       {/* Project Detail Dialog for Ongoing Contracts */}
       <Dialog open={isProgressOpen} onOpenChange={setIsProgressOpen}>
-        <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-[98vw] w-[98vw] max-h-[95vh] h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">{t({ en: 'Project Details', mr: 'प्रकल्प तपशील' })}</DialogTitle>
           </DialogHeader>
@@ -907,10 +908,27 @@ export function ContractsPage() {
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
                   <ImageWithFallback
-                    src={selectedContract.finalPhotos?.[0] || selectedContract.finalPhoto}
+                    src={selectedContract.finalPhotos?.[0] || selectedContract.finalPhoto || selectedContract.sitePhotos?.[0] || '/api/placeholder/400/200'}
                     alt={t(selectedContract.title)}
                     className="w-full h-64 object-cover rounded-lg mb-4"
+                    fallbackSrc="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=400&h=200&fit=crop"
                   />
+                  
+                  {/* Additional final photos if available */}
+                  {selectedContract.finalPhotos && selectedContract.finalPhotos.length > 1 && (
+                    <div className="grid grid-cols-2 gap-2 mt-2">
+                      {selectedContract.finalPhotos.slice(1, 5).map((photo, index) => (
+                        <ImageWithFallback
+                          key={index}
+                          src={photo}
+                          alt={`${t(selectedContract.title)} - Final Photo ${index + 2}`}
+                          className="w-full h-20 object-cover rounded-lg cursor-pointer hover:scale-105 transition-transform"
+                          onClick={() => window.open(photo, '_blank')}
+                          fallbackSrc="https://images.unsplash.com/photo-1541888946425-d81bb19240f5?w=200&h=100&fit=crop"
+                        />
+                      ))}
+                    </div>
+                  )}
                   
                   <div className="space-y-4">
                     <div>
@@ -1041,6 +1059,7 @@ export function ContractsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
     </div>
   );
 }

@@ -45,6 +45,30 @@ export const authService = {
   logout: () => {
     localStorage.removeItem('token');
     localStorage.removeItem('user');
+  },
+
+  // Forgot password - Send OTP
+  forgotPassword: async (mobileNumber) => {
+    try {
+      const response = await api.post('/auth/forgot-password', { mobileNumber });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
+  },
+
+  // Reset password with OTP
+  resetPassword: async ({ mobileNumber, otp, newPassword }) => {
+    try {
+      const response = await api.post('/auth/reset-password', {
+        mobileNumber,
+        otp,
+        newPassword
+      });
+      return response.data;
+    } catch (error) {
+      throw error.response?.data || error.message;
+    }
   }
 };
 

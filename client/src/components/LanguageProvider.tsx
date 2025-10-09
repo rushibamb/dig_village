@@ -90,7 +90,6 @@ export const translations = {
   taxPayment: { en: 'Tax Payment', mr: 'कर भरणा' },
   grievanceRedressal: { en: 'Grievance Redressal', mr: 'तक्रार निवारण' },
   newsUpdates: { en: 'News & Updates', mr: 'बातम्या आणि अपडेट्स' },
-  serviceApplications: { en: 'Service Applications', mr: 'सेवा अर्ज' },
   adminPanel: { en: 'Admin Panel', mr: 'प्रशासन पॅनेल' },
   
   // Quick Actions

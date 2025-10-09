@@ -15,7 +15,8 @@ import {
   generateEditOtp,
   verifyEditOtp,
   submitVillagerEdits,
-  getVillagerStats
+  getVillagerStats,
+  uploadVillagerImage
 } from '../services/villagerService';
 import { 
   Users, 
@@ -75,6 +76,7 @@ export function ManageVillagerPage() {
   
   // Loading states
   const [isLoading, setIsLoading] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   
   // Dynamic villager statistics
   const [villagerStats, setVillagerStats] = useState({
@@ -119,24 +121,7 @@ export function ManageVillagerPage() {
 
   // Mock data for recent submissions (admin view only)
   const recentSubmissions = [
-    {
-      id: 'REQ001',
-      type: 'add',
-      name: 'राम शर्मा',
-      mobile: '+91 9876543210',
-      status: 'pending',
-      submittedAt: '2024-01-15T10:30:00',
-      submittedBy: 'user@example.com'
-    },
-    {
-      id: 'REQ002', 
-      type: 'edit',
-      name: 'सीता पटेल',
-      mobile: '+91 9876543211',
-      status: 'approved',
-      submittedAt: '2024-01-14T15:45:00',
-      submittedBy: 'user2@example.com'
-    }
+    
   ];
 
   // Handler for Add Villager form submission
@@ -353,16 +338,51 @@ export function ManageVillagerPage() {
   };
 
   // Helper function to handle file upload
-  const handleFileUpload = (e: any) => {
+  const handleFileUpload = async (e: any) => {
     const file = e.target.files?.[0];
-    if (file) {
-      // For now, we'll just store the file name as a string
-      // In a real implementation, you'd upload the file to a server and get a URL
-      setFormData(prev => ({ ...prev, idProofPhoto: file.name }));
-      toast.success(t({ 
-        en: 'Photo selected successfully', 
-        mr: 'फोटो यशस्वीरित्या निवडला' 
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error(t({ 
+        en: 'Please select an image file', 
+        mr: 'कृपया एक प्रतिमा फाइल निवडा' 
       }));
+      return;
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(t({ 
+        en: 'File size must be less than 5MB', 
+        mr: 'फाइल आकार 5MB पेक्षा कमी असावा' 
+      }));
+      return;
+    }
+
+    setIsUploadingImage(true);
+    
+    try {
+      console.log('Starting image upload for file:', file.name);
+      const response = await uploadVillagerImage(file);
+      console.log('Upload response:', response);
+      
+      if (response.success) {
+        console.log('Image URL:', response.data.fileUrl);
+        setFormData(prev => ({ ...prev, idProofPhoto: response.data.fileUrl }));
+        toast.success(t({ 
+          en: 'Photo uploaded successfully', 
+          mr: 'फोटो यशस्वीरित्या अपलोड झाला' 
+        }));
+      }
+    } catch (error: any) {
+      console.error('Image upload error:', error);
+      toast.error(error.message || t({ 
+        en: 'Failed to upload photo', 
+        mr: 'फोटो अपलोड करण्यात अयशस्वी' 
+      }));
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -716,13 +736,26 @@ export function ManageVillagerPage() {
                         type="button"
                         variant="outline"
                         onClick={() => document.getElementById('idProof')?.click()}
+                        disabled={isUploadingImage}
                         className="glass-effect border-villager/20 hover:bg-villager hover:text-white transition-all duration-300 hover-scale"
                       >
                         <Upload className="h-4 w-4 mr-2" />
-                        {t({ en: 'Upload Photo', mr: 'फोटो अपलोड करा' })}
+                        {isUploadingImage ? t({ en: 'Uploading...', mr: 'अपलोड करत आहे...' }) : t({ en: 'Upload Photo', mr: 'फोटो अपलोड करा' })}
                       </Button>
                       {formData.idProofPhoto && (
-                        <span className="text-green-600 font-medium animate-fade-in-up">✓ {formData.idProofPhoto}</span>
+                        <div className="flex items-center gap-2 animate-fade-in-up">
+                          <span className="text-green-600 font-medium">✓</span>
+                          <span className="text-green-600 font-medium">
+                            {formData.idProofPhoto.includes('http') ? t({ en: 'Photo uploaded', mr: 'फोटो अपलोड झाला' }) : formData.idProofPhoto}
+                          </span>
+                          {formData.idProofPhoto.includes('http') && (
+                            <img 
+                              src={formData.idProofPhoto} 
+                              alt="ID Proof" 
+                              className="w-8 h-8 rounded border object-cover"
+                            />
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -991,13 +1024,26 @@ export function ManageVillagerPage() {
                         type="button"
                         variant="outline"
                         onClick={() => document.getElementById('editIdProof')?.click()}
+                        disabled={isUploadingImage}
                         className="glass-effect border-orange-500/20 hover:bg-orange-500 hover:text-white transition-all duration-300 hover-scale"
                       >
                         <Upload className="h-4 w-4 mr-2" />
-                        {t({ en: 'Upload Photo', mr: 'फोटो अपलोड करा' })}
+                        {isUploadingImage ? t({ en: 'Uploading...', mr: 'अपलोड करत आहे...' }) : t({ en: 'Upload Photo', mr: 'फोटो अपलोड करा' })}
                       </Button>
                       {formData.idProofPhoto && (
-                        <span className="text-green-600 font-medium animate-fade-in-up">✓ {formData.idProofPhoto}</span>
+                        <div className="flex items-center gap-2 animate-fade-in-up">
+                          <span className="text-green-600 font-medium">✓</span>
+                          <span className="text-green-600 font-medium">
+                            {formData.idProofPhoto.includes('http') ? t({ en: 'Photo uploaded', mr: 'फोटो अपलोड झाला' }) : formData.idProofPhoto}
+                          </span>
+                          {formData.idProofPhoto.includes('http') && (
+                            <img 
+                              src={formData.idProofPhoto} 
+                              alt="ID Proof" 
+                              className="w-8 h-8 rounded border object-cover"
+                            />
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>

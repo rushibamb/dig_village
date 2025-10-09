@@ -6,7 +6,8 @@ const {
   generateOtpForEdit,
   verifyOtpAndGetVillager,
   submitVillagerEditRequest,
-  getVillagerStats
+  getVillagerStats,
+  getMyVillagerProfile
 } = require('../controllers/villagerController');
 
 // @route   POST /api/villagers/requests/new
@@ -33,6 +34,11 @@ router.put('/requests/edit/:id', protect, submitVillagerEditRequest);
 // @desc    Get villager statistics for dashboard
 // @access  Public
 router.get('/stats', getVillagerStats);
+
+// @route   GET /api/villagers/my-profile
+// @desc    Get logged-in user's villager profile
+// @access  Private
+router.get('/my-profile', protect, getMyVillagerProfile);
 
 module.exports = router;
 

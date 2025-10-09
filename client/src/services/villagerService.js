@@ -1,4 +1,5 @@
 import api from './api';
+import { uploadVillagerPhoto } from './cloudinaryService';
 
 // User-side villager functions
 
@@ -197,6 +198,32 @@ export const getVillagerStats = async () => {
     return response.data;
   } catch (error) {
     throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Get logged-in user's villager profile
+ * @returns {Promise} API response with user's villager profile
+ */
+export const getMyVillagerProfile = async () => {
+  try {
+    const response = await api.get('/villagers/my-profile');
+    return response.data;
+  } catch (error) {
+    throw error.response?.data || error.message;
+  }
+};
+
+/**
+ * Upload villager ID proof photo
+ * @param {File} file - Image file
+ * @returns {Promise} API response with image URL
+ */
+export const uploadVillagerImage = async (file) => {
+  try {
+    return await uploadVillagerPhoto(file);
+  } catch (error) {
+    throw error;
   }
 };
 
