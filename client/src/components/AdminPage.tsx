@@ -576,7 +576,33 @@ function AdminPage() {
   const handleFileSelect = (event) => {
     const file = event.target.files[0];
     if (file) {
+      // Validate file type
+      const fileName = file.name.toLowerCase();
+      const isValidCsv = fileName.endsWith('.csv');
+      
+      if (!isValidCsv) {
+        toast.error("Please select a CSV file (.csv extension)");
+        event.target.value = ''; // Clear the input
+        setSelectedFile(null);
+        return;
+      }
+      
+      // Validate file size (5MB limit)
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      if (file.size > maxSize) {
+        toast.error("File size too large. Please select a file smaller than 5MB.");
+        event.target.value = ''; // Clear the input
+        setSelectedFile(null);
+        return;
+      }
+      
       setSelectedFile(file);
+      console.log('Selected CSV file:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified
+      });
     }
   };
 
@@ -587,8 +613,21 @@ function AdminPage() {
     }
 
     try {
+      console.log('Starting CSV upload:', {
+        fileName: selectedFile.name,
+        fileSize: selectedFile.size,
+        fileType: selectedFile.type,
+        lastModified: selectedFile.lastModified
+      });
+
       const formData = new FormData();
       formData.append('file', selectedFile);
+      
+      // Log FormData contents for debugging
+      console.log('FormData contents:');
+      for (let [key, value] of formData.entries()) {
+        console.log(`${key}:`, value);
+      }
       
       const response = await adminUploadTaxCsv(formData);
       toast.success(`Successfully imported ${response.count} tax records`);
@@ -596,8 +635,17 @@ function AdminPage() {
       setSelectedFile(null);
       fetchTaxRecords();
     } catch (error) {
-      console.error("Failed to upload tax records:", error);
-      toast.error("Failed to upload tax records");
+      console.error("Upload error:", error);
+      console.error("Error details:", {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        statusText: error.response?.statusText
+      });
+      
+      // Show more specific error message
+      const errorMessage = error.response?.data?.message || error.message || "Failed to upload CSV file";
+      toast.error(`Upload failed: ${errorMessage}`);
     }
   };
 
@@ -5136,7 +5184,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                     <Input
                       id="csv-file"
                       type="file"
-                      accept=".csv,.xlsx"
+                      accept=".csv,text/csv,application/csv"
                       onChange={handleFileSelect}
                       className="mt-2"
                     />
@@ -5654,7 +5702,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                                     </Button>
                                     <Button 
                                       size="sm" 
-                                      className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
+                                      className="bg-gradient-to-r from-cyan-500 to-cyan-600 hover:from-cyan-600 hover:to-cyan-700 text-black shadow-md hover:shadow-lg transition-all duration-300"
                                       onClick={() => handleShareGrievance(grievance)}
                                     >
                                       <Share2 className="h-4 w-4 mr-1" />
@@ -5664,14 +5712,14 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                                       <>
                                         <Button 
                                           size="sm" 
-                                          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
+                                          className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-black shadow-md hover:shadow-lg transition-all duration-300"
                                           onClick={() => handleUpdateAdminStatus(grievance._id, 'Approved')}
                                         >
                                           {t({ en: 'Approve', mr: 'मंजूर' })}
                                         </Button>
                                         <Button 
                                           size="sm" 
-                                          className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
+                                          className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-black shadow-md hover:shadow-lg transition-all duration-300"
                                           onClick={() => handleUpdateAdminStatus(grievance._id, 'Rejected')}
                                         >
                                           {t({ en: 'Reject', mr: 'नकार' })}
@@ -5926,7 +5974,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                               </div>
                               <Button 
                                 onClick={handleMarkAsResolved}
-                                className="bg-gray-800 hover:bg-gray-900 text-white"
+                                className="bg-gray-800 hover:bg-gray-900 text-black"
                               >
                                 <CheckCircle className="h-4 w-4 mr-2" />
                                 {t({ en: 'Mark as Resolved', mr: 'निराकरण चिन्हांकित करा' })}
@@ -6017,7 +6065,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                     <div className="flex gap-3">
                       <Button
                         onClick={() => copyToClipboard(generateShareableContent(shareableGrievance))}
-                        className="bg-blue-600 hover:bg-blue-700 text-white flex-1"
+                        className="bg-blue-600 hover:bg-blue-700 text-black flex-1"
                       >
                         <Share2 className="h-4 w-4 mr-2" />
                         {t({ en: 'Copy to Clipboard', mr: 'क्लिपबोर्डवर कॉपी करा' })}
@@ -6228,7 +6276,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                                 <p className="text-gray-500 mb-4">{t({ en: 'Add your first committee member to get started', mr: 'सुरुवात करण्यासाठी आपला पहिला समिती सदस्य जोडा' })}</p>
                                 <Button 
                                   onClick={() => setIsAddCommitteeMemberOpen(true)}
-                                  className="bg-teal-600 hover:bg-teal-700 text-white"
+                                  className="bg-teal-600 hover:bg-teal-700 text-black"
                                 >
                                   <Plus className="h-4 w-4 mr-2" />
                                   {t({ en: 'Add First Member', mr: 'पहिला सदस्य जोडा' })}
@@ -6357,7 +6405,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                   <p className="text-gray-600 mt-1">{t({ en: 'Manage village news, announcements, alerts and events', mr: 'गावातील बातम्या, घोषणा, सूचना आणि कार्यक्रम व्यवस्थापित करा' })}</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button onClick={() => setIsAddNewsOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-white">
+                  <Button onClick={() => setIsAddNewsOpen(true)} className="bg-indigo-600 hover:bg-indigo-700 text-black">
                     <Plus className="h-4 w-4 mr-2" />
                     {t({ en: 'Add News', mr: 'बातमी जोडा' })}
                   </Button>
@@ -6758,7 +6806,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                 </div>
                 <div className="flex gap-2">
                   <Button 
-                    className="bg-indigo-600 hover:bg-indigo-700 text-white"
+                    className="bg-indigo-600 hover:bg-indigo-700 text-black"
                     onClick={() => setIsAddMediaOpen(true)}
                   >
                     <Plus className="h-4 w-4 mr-2" />
@@ -7107,7 +7155,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">{t({ en: 'Open Tenders', mr: 'खुले निविदा' })}</h3>
                     <Button 
-                      className="bg-blue-600 hover:bg-blue-700 text-white"
+                      className="bg-blue-600 hover:bg-blue-700 text-black"
                       onClick={() => handleOpenProjectAddModal('Tender')}
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -7257,7 +7305,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                   <div className="flex justify-between items-center">
                     <h3 className="text-lg font-semibold">{t({ en: 'Completed Projects', mr: 'पूर्ण झालेले प्रकल्प' })}</h3>
                     <Button 
-                      className="bg-green-600 hover:bg-green-700 text-white"
+                      className="bg-green-600 hover:bg-green-700 text-black"
                       onClick={() => handleOpenProjectAddModal('Completed')}
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -9612,7 +9660,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                 </Button>
                 <Button
                   onClick={handleAddCommitteeMember}
-                  className="bg-purple-600 hover:bg-purple-700 text-white px-6 py-2"
+                  className="bg-purple-600 hover:bg-purple-700 text-black px-6 py-2"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   {t({ en: 'Add Member', mr: 'सदस्य जोडा' })}
@@ -9794,7 +9842,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                       setIsCommitteeMemberDetailOpen(false);
                       setIsEditCommitteeMemberOpen(true);
                     }}
-                    className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2"
+                    className="bg-teal-600 hover:bg-teal-700 text-black px-6 py-2"
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     {t({ en: 'Edit Member', mr: 'सदस्य संपादित करा' })}
@@ -10067,7 +10115,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                   </Button>
                   <Button
                     onClick={handleUpdateCommitteeMember}
-                    className="bg-teal-600 hover:bg-teal-700 text-white px-6 py-2"
+                    className="bg-teal-600 hover:bg-teal-700 text-black px-6 py-2"
                   >
                     <Save className="h-4 w-4 mr-2" />
                     {t({ en: 'Save Changes', mr: 'बदल जतन करा' })}
@@ -10222,7 +10270,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                             officeHours: defaultHours
                           });
                         }}
-                        className="bg-purple-600 hover:bg-purple-700 text-white"
+                        className="bg-purple-600 hover:bg-purple-700 text-black"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         {t({ en: 'Add Default Hours', mr: 'डिफॉल्ट वेळा जोडा' })}

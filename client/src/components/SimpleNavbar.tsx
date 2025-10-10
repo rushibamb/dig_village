@@ -91,25 +91,25 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
       id: 'home',
       label: { en: 'Home', mr: 'मुख्यपृष्ठ' },
       icon: Home,
-      gradient: 'from-emerald-500 to-teal-600'
+      gradient: 'from-blue-500 to-blue-600'
     },
     {
       id: 'tax',
       label: { en: 'Tax Payment', mr: 'कर भरणा' },
       icon: CreditCard,
-      gradient: 'from-red-500 to-rose-600'
+      gradient: 'from-blue-500 to-blue-600'
     },
     {
       id: 'grievance',
       label: { en: 'Grievance', mr: 'तक्रार' },
       icon: FileText,
-      gradient: 'from-purple-500 to-indigo-600'
+      gradient: 'from-blue-500 to-blue-600'
     },
     {
       id: 'villager',
       label: { en: 'Manage Villager', mr: 'गावकरी व्यवस्थापन' },
       icon: Users,
-      gradient: 'from-cyan-500 to-blue-600',
+      gradient: 'from-blue-500 to-blue-600',
       requiresAuth: true
     },
 
@@ -117,25 +117,25 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
       id: 'committee',
       label: { en: 'Committee', mr: 'समिती' },
       icon: Building2,
-      gradient: 'from-violet-500 to-purple-600'
+      gradient: 'from-blue-500 to-blue-600'
     },
     {
       id: 'media',
       label: { en: 'Media', mr: 'मीडिया' },
       icon: Camera,
-      gradient: 'from-pink-500 to-rose-600'
+      gradient: 'from-blue-500 to-blue-600'
     },
     {
       id: 'news',
       label: { en: 'News', mr: 'बातम्या' },
       icon: Newspaper,
-      gradient: 'from-indigo-500 to-blue-600'
+      gradient: 'from-blue-500 to-blue-600'
     },
     {
       id: 'contracts',
       label: { en: 'Contracts', mr: 'कंत्राटे' },
       icon: FileBarChart,
-      gradient: 'from-teal-500 to-cyan-600'
+      gradient: 'from-blue-500 to-blue-600'
     },
   ];
 

@@ -232,11 +232,11 @@ export function MediaPage() {
   };
 
   return (
-    <div className="min-h-screen bg-pink-50 p-4">
+    <div className="min-h-screen bg-blue-50 p-4">
       <div className="container mx-auto max-w-7xl">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="w-20 h-20 bg-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+          <div className="w-20 h-20 bg-blue-900 rounded-full flex items-center justify-center mx-auto mb-4">
             <Camera className="h-10 w-10 text-white" />
           </div>
           <h1 className="text-4xl font-bold text-gray-900 mb-2">
@@ -253,7 +253,7 @@ export function MediaPage() {
             <Button
               variant={activeTab === 'photos' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('photos')}
-              className={`gap-2 ${activeTab === 'photos' ? 'bg-pink-600 text-white' : 'text-gray-600'}`}
+              className={`gap-2 ${activeTab === 'photos' ? 'bg-blue-900 hover:bg-blue-950 text-white' : 'text-gray-600'}`}
             >
               <Camera className="h-4 w-4" />
               {t({ en: 'Photos', mr: 'फोटो' })} ({photos.length})
@@ -261,7 +261,7 @@ export function MediaPage() {
             <Button
               variant={activeTab === 'videos' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('videos')}
-              className={`gap-2 ${activeTab === 'videos' ? 'bg-pink-600 text-white' : 'text-gray-600'}`}
+              className={`gap-2 ${activeTab === 'videos' ? 'bg-blue-900 hover:bg-blue-950 text-white' : 'text-gray-600'}`}
             >
               <Video className="h-4 w-4" />
               {t({ en: 'Videos', mr: 'व्हिडिओ' })} ({videos.length})
@@ -278,7 +278,7 @@ export function MediaPage() {
                 variant={selectedCategory === 'all' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedCategory('all')}
-                className={selectedCategory === 'all' ? 'bg-pink-600 text-white' : ''}
+                className={selectedCategory === 'all' ? 'bg-blue-900 hover:bg-blue-950 text-white' : ''}
               >
                 {t({ en: 'All Media', mr: 'सर्व मीडिया' })}
               </Button>
@@ -290,7 +290,7 @@ export function MediaPage() {
                   variant={selectedCategory === category._id ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCategory(category._id)}
-                  className={selectedCategory === category._id ? 'bg-pink-600 text-white' : ''}
+                  className={selectedCategory === category._id ? 'bg-blue-900 hover:bg-blue-950 text-white' : ''}
                 >
                   {t(category.name)} ({category.mediaCount || 0})
                 </Button>
@@ -319,7 +319,7 @@ export function MediaPage() {
         {/* Content */}
         {loading ? (
           <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-pink-600"></div>
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900"></div>
             <span className="ml-3 text-gray-600">Loading media...</span>
           </div>
         ) : activeTab === 'photos' ? (
@@ -370,7 +370,7 @@ export function MediaPage() {
                     </div>
                     
                     {/* Category Badge */}
-                    <Badge className="absolute top-3 left-3 bg-pink-600 text-white shadow-lg">
+                    <Badge className="absolute top-3 left-3 bg-blue-900 text-white shadow-lg">
                       {photo.category?.name?.en || 'Uncategorized'}
                     </Badge>
                     
@@ -442,7 +442,7 @@ export function MediaPage() {
                     )}
                     
                     {/* Category Badge */}
-                    <Badge className="absolute top-3 left-3 bg-pink-600 text-white shadow-lg">
+                    <Badge className="absolute top-3 left-3 bg-blue-900 text-white shadow-lg">
                       {video.category?.name?.en || 'Uncategorized'}
                     </Badge>
                     

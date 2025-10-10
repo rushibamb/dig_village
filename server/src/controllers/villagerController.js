@@ -348,14 +348,14 @@ const submitVillagerEditRequest = async (req, res) => {
     // Allow mobile number changes - family members can share mobile numbers
 
     // Normalize mobile number format for consistent storage
+    let normalizedMobileNumber = mobileNumber;
     if (mobileNumber) {
-      let normalizedMobileNumber = mobileNumber.trim();
+      normalizedMobileNumber = mobileNumber.trim();
       if (normalizedMobileNumber.startsWith('+91')) {
         normalizedMobileNumber = normalizedMobileNumber.substring(3);
       } else if (normalizedMobileNumber.startsWith('91') && normalizedMobileNumber.length > 10) {
         normalizedMobileNumber = normalizedMobileNumber.substring(2);
       }
-      mobileNumber = normalizedMobileNumber;
     }
 
     // Check if Aadhar number is being changed and if it already exists
@@ -375,7 +375,7 @@ const submitVillagerEditRequest = async (req, res) => {
     // Update villager fields
     const updateData = {};
     if (fullName) updateData.fullName = fullName;
-    if (mobileNumber) updateData.mobileNumber = mobileNumber;
+    if (normalizedMobileNumber) updateData.mobileNumber = normalizedMobileNumber;
     if (gender) updateData.gender = gender;
     if (dateOfBirth) updateData.dateOfBirth = dateOfBirth;
     if (aadharNumber) updateData.aadharNumber = aadharNumber;

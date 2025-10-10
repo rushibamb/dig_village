@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap");
+@import url('https://fonts.googleapis.com/css2?family=Hind:wght@300;400;500;600;700&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Poppins:wght@400;500;600;700&display=swap');
 /*! tailwindcss v4.1.3 | MIT License | https://tailwindcss.com */
 @layer properties {
   @supports (((-webkit-hyphens: none)) and (not (margin-trim: inline))) or ((-moz-orient: inline) and (not (color: rgb(from red r g b)))) {
@@ -73,7 +73,7 @@
 
 @layer theme {
   :root, :host {
-    --font-sans: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    --font-sans: 'Inter', 'Noto Sans Devanagari', 'Mukta', ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
     --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     --color-red-50: oklch(.971 .013 17.38);
     --color-red-200: oklch(.885 .062 18.334);
@@ -5160,11 +5160,52 @@ html {
 }
 
 .font-inter {
-  font-family: Inter, sans-serif;
+  font-family: 'Inter', sans-serif;
+}
+
+.font-poppins {
+  font-family: 'Poppins', sans-serif;
 }
 
 .font-devanagari {
-  font-family: Noto Sans Devanagari, sans-serif;
+  font-family: 'Hind', sans-serif;
+}
+
+.font-marathi {
+  font-family: 'Hind', sans-serif;
+}
+
+.font-marathi-display {
+  font-family: 'Hind', sans-serif;
+}
+
+/* Enhanced Marathi text rendering */
+[lang="mr"], .lang-mr {
+  font-family: 'Hind', sans-serif;
+  font-feature-settings: "kern" 1, "liga" 1;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Better line-height for Marathi text */
+[lang="mr"] h1, [lang="mr"] h2, [lang="mr"] h3, [lang="mr"] h4, [lang="mr"] h5, [lang="mr"] h6,
+.lang-mr h1, .lang-mr h2, .lang-mr h3, .lang-mr h4, .lang-mr h5, .lang-mr h6 {
+  line-height: 1.4;
+  font-weight: 600;
+}
+
+[lang="mr"] p, [lang="mr"] span, [lang="mr"] div,
+.lang-mr p, .lang-mr span, .lang-mr div {
+  line-height: 1.6;
+}
+
+/* Optimize font size for better readability */
+body {
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .bg-brand {

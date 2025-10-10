@@ -212,7 +212,7 @@ export function TaxPaymentPage() {
           name: record.ownerName,
         },
         theme: {
-          color: "#dc2626" // Tax color theme
+          color: "#3b82f6" // Blue color theme to match landing page
         },
         modal: {
           ondismiss: () => {
@@ -342,26 +342,26 @@ export function TaxPaymentPage() {
   ];
 
   const taxTypes = [
-    { id: 'all', label: { en: 'All Taxes', mr: 'सर्व कर' }, icon: CreditCard, gradient: 'from-tax-color to-red-600' },
-    { id: 'property', label: { en: 'Property Tax', mr: 'मालमत्ता कर' }, icon: HomeIcon, gradient: 'from-orange-500 to-red-600' },
-    { id: 'water', label: { en: 'Water Tax', mr: 'पाणी कर' }, icon: Droplets, gradient: 'from-blue-500 to-cyan-600' }
+    { id: 'all', label: { en: 'All Taxes', mr: 'सर्व कर' }, icon: CreditCard, gradient: 'from-blue-500 to-cyan-600' },
+    { id: 'property', label: { en: 'Property Tax', mr: 'मालमत्ता कर' }, icon: HomeIcon, gradient: 'from-blue-400 to-blue-600' },
+    { id: 'water', label: { en: 'Water Tax', mr: 'पाणी कर' }, icon: Droplets, gradient: 'from-cyan-500 to-blue-600' }
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 via-orange-50 to-pink-50 relative overflow-hidden">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-purple-50 relative overflow-hidden">
       {/* Animated background elements */}
-      <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-br from-red-400/20 to-orange-500/20 rounded-full animate-float"></div>
-      <div className="absolute top-40 right-16 w-24 h-24 bg-gradient-to-br from-pink-400/20 to-red-500/20 rounded-full animate-float" style={{ animationDelay: '1s' }}></div>
-      <div className="absolute bottom-32 left-32 w-20 h-20 bg-gradient-to-br from-orange-400/20 to-yellow-500/20 rounded-full animate-float" style={{ animationDelay: '2s' }}></div>
+      <div className="absolute top-20 left-10 w-32 h-32 bg-gradient-to-br from-blue-400/20 to-purple-500/20 rounded-full animate-float"></div>
+      <div className="absolute top-40 right-16 w-24 h-24 bg-gradient-to-br from-cyan-400/20 to-blue-500/20 rounded-full animate-float" style={{ animationDelay: '1s' }}></div>
+      <div className="absolute bottom-32 left-32 w-20 h-20 bg-gradient-to-br from-blue-400/20 to-cyan-500/20 rounded-full animate-float" style={{ animationDelay: '2s' }}></div>
 
       <div className="container mx-auto max-w-6xl p-4 relative">
         {/* Header */}
         <div className="text-center mb-8 animate-fade-in-up">
           <div className="relative inline-block mb-4">
-            <div className="w-20 h-20 bg-gradient-to-br from-tax-color to-red-600 rounded-2xl flex items-center justify-center mx-auto shadow-2xl animate-glow hover-float">
+            <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-2xl flex items-center justify-center mx-auto shadow-2xl animate-glow hover-float">
               <CreditCard className="h-10 w-10 text-white animate-pulse-slow" />
             </div>
-            <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center animate-pulse-slow">
+            <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-br from-purple-400 to-blue-500 rounded-full flex items-center justify-center animate-pulse-slow">
               <Sparkles className="h-3 w-3 text-white" />
             </div>
           </div>
@@ -423,7 +423,7 @@ export function TaxPaymentPage() {
             {/* Search Section */}
             <Card className="mb-6 glass-card border-0 shadow-xl animate-fade-in-up" style={{ animationDelay: '0.4s' }}>
               <CardHeader>
-                <CardTitle className="text-tax flex items-center gap-2">
+                <CardTitle className="text-blue-600 flex items-center gap-2">
                   <Search className="h-5 w-5 animate-pulse-slow" />
                   {t({ en: 'Find Tax Records', mr: 'कर रेकॉर्ड शोधा' })}
                 </CardTitle>
@@ -438,14 +438,14 @@ export function TaxPaymentPage() {
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={t({ en: 'Enter full name or house number (e.g., राम शर्मा, 123)', mr: 'पूर्ण नाव किंवा घर क्रमांक टाका (उदा., राम शर्मा, 123)' })}
-                      className="glass-effect border-tax/20 focus:border-tax hover-glow transition-all duration-300"
+                      className="glass-effect border-blue-200 focus:border-blue-500 hover-glow transition-all duration-300"
                       onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
                     />
                   </div>
                   <Button 
                     onClick={handleSearch}
                     disabled={isLoading}
-                    className="bg-gradient-to-r from-tax-color to-red-600 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300 disabled:opacity-50"
+                    className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300 disabled:opacity-50"
                   >
                     {isLoading ? (
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
@@ -460,17 +460,17 @@ export function TaxPaymentPage() {
 
             {/* Authentication Warning */}
             {!isLoggedIn && (
-              <Card className="mb-6 glass-card border-0 shadow-xl border-red-200 animate-fade-in-up" style={{ animationDelay: '0.45s' }}>
+              <Card className="mb-6 glass-card border-0 shadow-xl border-blue-200 animate-fade-in-up" style={{ animationDelay: '0.45s' }}>
                 <CardContent className="p-6">
-                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-red-50 to-orange-50 rounded-xl border border-red-200">
-                    <div className="w-12 h-12 bg-gradient-to-br from-red-500 to-orange-600 rounded-full flex items-center justify-center animate-pulse-slow">
+                  <div className="flex items-center gap-4 p-4 bg-gradient-to-r from-blue-50 to-cyan-50 rounded-xl border border-blue-200">
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center animate-pulse-slow">
                       <AlertTriangle className="h-6 w-6 text-white" />
                     </div>
                     <div className="flex-1">
-                      <h3 className="font-bold text-red-700 mb-1">
+                      <h3 className="font-bold text-blue-700 mb-1">
                         {t({ en: 'Login Required', mr: 'लॉगिन आवश्यक' })}
                       </h3>
-                      <p className="text-red-600 text-sm mb-3">
+                      <p className="text-blue-600 text-sm mb-3">
                         {t({ 
                           en: 'You need to login to search tax records and make payments. Please login to access all features.',
                           mr: 'कर रेकॉर्ड शोधण्यासाठी आणि पेमेंट करण्यासाठी तुम्हाला लॉगिन करावे लागेल. सर्व वैशिष्ट्ये वापरण्यासाठी कृपया लॉगिन करा.'
@@ -478,7 +478,7 @@ export function TaxPaymentPage() {
                       </p>
                       <Button 
                         onClick={() => window.location.href = '/login'}
-                        className="bg-gradient-to-r from-red-500 to-orange-600 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300"
+                        className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300"
                         size="sm"
                       >
                         <User className="h-4 w-4 mr-2" />
@@ -505,7 +505,7 @@ export function TaxPaymentPage() {
                   </p>
                   <Button 
                     onClick={() => handleDownloadReceipt(paymentSuccessRecord.id)} 
-                    className="bg-green-600 hover:bg-green-700 text-white"
+                    className="bg-green-600 hover:bg-green-700 text-black"
                   >
                     <Download className="h-4 w-4 mr-2" />
                     {t({ en: 'Download Receipt', mr: 'रसीद डाउनलोड करा' })}
@@ -525,7 +525,7 @@ export function TaxPaymentPage() {
             {hasSearched && (
               <Card className="glass-card border-0 shadow-xl animate-fade-in-up" style={{ animationDelay: '0.5s' }}>
                 <CardHeader>
-                  <CardTitle className="text-tax flex items-center gap-2">
+                  <CardTitle className="text-blue-600 flex items-center gap-2">
                     <Search className="h-5 w-5" />
                     {t({ en: 'Search Results', mr: 'शोध परिणाम' })}
                   </CardTitle>
@@ -533,7 +533,7 @@ export function TaxPaymentPage() {
                 <CardContent>
                   {isLoading ? (
                     <div className="text-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-tax mx-auto mb-4"></div>
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
                       <p className="text-gray-600">
                         {t({ en: 'Searching tax records...', mr: 'कर रेकॉर्ड शोधत आहे...' })}
                       </p>
@@ -556,11 +556,11 @@ export function TaxPaymentPage() {
                   ) : (
                     <div className="space-y-4">
                       {searchResults.map((record) => (
-                        <div key={record.id} className="glass-effect p-4 rounded-lg border border-gray-200 hover:border-tax/30 transition-all duration-300">
+                        <div key={record.id} className="glass-effect p-4 rounded-lg border border-gray-200 hover:border-blue-300 transition-all duration-300">
                           <div className="flex items-center justify-between">
                             <div className="flex-1">
                               <div className="flex items-center gap-3 mb-2">
-                                <div className="w-10 h-10 bg-gradient-to-br from-tax-color to-red-600 rounded-full flex items-center justify-center">
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-cyan-600 rounded-full flex items-center justify-center">
                                   <User className="h-5 w-5 text-white" />
                                 </div>
                                 <div>
@@ -577,7 +577,7 @@ export function TaxPaymentPage() {
                                 </div>
                                 <div>
                                   <span className="text-gray-600">{t({ en: 'Amount Due:', mr: 'देय रक्कम:' })}</span>
-                                  <p className="font-bold text-tax">₹{record.amount.toLocaleString('en-IN')}</p>
+                                  <p className="font-bold text-blue-600">₹{record.amount.toLocaleString('en-IN')}</p>
                                 </div>
                                 <div>
                                   <span className="text-gray-600">{t({ en: 'Due Date:', mr: 'देय तारीख:' })}</span>
@@ -599,7 +599,7 @@ export function TaxPaymentPage() {
                               <div className="ml-4">
                                 <Button
                                   onClick={() => handlePayment(record)}
-                                  className="bg-gradient-to-r from-tax-color to-red-600 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300"
+                                  className="bg-gradient-to-r from-blue-500 to-cyan-600 text-white border-0 hover-scale hover:shadow-xl transition-all duration-300"
                                 >
                                   <CreditCard className="h-4 w-4 mr-2" />
                                   {t({ en: 'Pay Now', mr: 'आत्ता पैसे द्या' })}
@@ -611,7 +611,7 @@ export function TaxPaymentPage() {
                                 <Button
                                   onClick={() => handleDownloadReceipt(record.id)}
                                   variant="outline"
-                                  className="border-tax text-tax hover:bg-tax hover:text-white transition-all duration-300"
+                                  className="border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white transition-all duration-300"
                                 >
                                   <Download className="h-4 w-4 mr-2" />
                                   {t({ en: 'Download Receipt', mr: 'रसीद डाउनलोड करा' })}
@@ -642,8 +642,8 @@ export function TaxPaymentPage() {
                     <div className="grid md:grid-cols-2 gap-4 text-sm">
                       <div className="glass-effect p-4 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
-                          <HomeIcon className="h-5 w-5 text-orange-600" />
-                          <h5 className="font-semibold text-orange-600">{t({ en: 'Property Tax', mr: 'मालमत्ता कर' })}</h5>
+                          <HomeIcon className="h-5 w-5 text-blue-600" />
+                          <h5 className="font-semibold text-blue-600">{t({ en: 'Property Tax', mr: 'मालमत्ता कर' })}</h5>
                         </div>
                         <ul className="text-gray-600 space-y-1 text-left">
                           <li>• {t({ en: 'Residential: ₹25/sq ft annually', mr: 'निवासी: ₹२५/चौ.फुट वार्षिक' })}</li>

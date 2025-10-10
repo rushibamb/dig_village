@@ -185,11 +185,30 @@ const csvUpload = multer({
     fileSize: 5 * 1024 * 1024, // 5MB limit for CSV files
   },
   fileFilter: (req, file, cb) => {
-    // Check if file is CSV
-    if (file.mimetype === 'text/csv' || path.extname(file.originalname).toLowerCase() === '.csv') {
+    // Check if file is CSV by extension and common MIME types
+    const allowedMimeTypes = [
+      'text/csv',
+      'application/csv',
+      'text/plain',
+      'application/vnd.ms-excel',
+      'application/octet-stream'
+    ];
+    
+    const isCsvByExtension = path.extname(file.originalname).toLowerCase() === '.csv';
+    const isCsvByMimeType = allowedMimeTypes.includes(file.mimetype);
+    
+    console.log('File validation:', {
+      originalname: file.originalname,
+      mimetype: file.mimetype,
+      extension: path.extname(file.originalname).toLowerCase(),
+      isCsvByExtension,
+      isCsvByMimeType
+    });
+    
+    if (isCsvByExtension || isCsvByMimeType) {
       cb(null, true);
     } else {
-      cb(new Error('Only CSV files are allowed!'));
+      cb(new Error(`Only CSV files are allowed! Received: ${file.mimetype} (${file.originalname})`));
     }
   }
 });

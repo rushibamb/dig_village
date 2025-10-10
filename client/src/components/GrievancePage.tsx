@@ -556,13 +556,28 @@ export function GrievancePage() {
                         )}
                         
                         {grievance.adminStatus === 'Approved' && grievance.assignedWorker && (
-                          <div className="bg-green-50 border-l-4 border-green-400 p-3 rounded">
-                            <p className="text-sm font-medium text-green-800 mb-1">
-                              {t({ en: 'Assigned to:', mr: 'नियुक्त केले:' })}
+                          <div className="bg-blue-50 border-l-4 border-blue-400 p-3 rounded">
+                            <p className="text-sm font-medium text-blue-800 mb-2">
+                              {t({ en: 'Assigned Worker:', mr: 'नियुक्त कामगार:' })}
                             </p>
-                            <p className="text-green-700 text-sm">
-                              {grievance.assignedWorker.name} - {grievance.assignedWorker.department}
-                            </p>
+                            <div className="space-y-1 text-sm text-blue-700">
+                              <p className="font-semibold">{grievance.assignedWorker.name}</p>
+                              <p>{grievance.assignedWorker.department}</p>
+                              {grievance.assignedWorker.phone && (
+                                <p className="flex items-center gap-1">
+                                  📞 <a href={`tel:${grievance.assignedWorker.phone}`} className="hover:underline">
+                                    {grievance.assignedWorker.phone}
+                                  </a>
+                                </p>
+                              )}
+                              {grievance.assignedWorker.email && (
+                                <p className="flex items-center gap-1">
+                                  ✉️ <a href={`mailto:${grievance.assignedWorker.email}`} className="hover:underline">
+                                    {grievance.assignedWorker.email}
+                                  </a>
+                                </p>
+                              )}
+                            </div>
                           </div>
                         )}
                         
@@ -752,9 +767,43 @@ export function GrievancePage() {
                     </Badge>
                   </div>
                   {selectedGrievance.assignedWorker && (
-                    <div>
-                      <label className="font-medium text-muted-foreground">{t({ en: 'Assigned Worker', mr: 'नियुक्त कामगार' })}</label>
-                      <p className="text-foreground font-semibold">{selectedGrievance.assignedWorker.name} - {selectedGrievance.assignedWorker.department}</p>
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-2">
+                      <label className="font-medium text-blue-900 block mb-3">{t({ en: 'Assigned Worker', mr: 'नियुक्त कामगार' })}</label>
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm text-muted-foreground">{t({ en: 'Name:', mr: 'नाव:' })}</span>
+                          <p className="text-foreground font-semibold">{selectedGrievance.assignedWorker.name}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <FileText className="h-4 w-4 text-blue-600" />
+                          <span className="text-sm text-muted-foreground">{t({ en: 'Department:', mr: 'विभाग:' })}</span>
+                          <p className="text-foreground font-semibold">{selectedGrievance.assignedWorker.department}</p>
+                        </div>
+                        {selectedGrievance.assignedWorker.phone && (
+                          <div className="flex items-center gap-2">
+                            <svg className="h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/>
+                            </svg>
+                            <span className="text-sm text-muted-foreground">{t({ en: 'Phone:', mr: 'फोन:' })}</span>
+                            <a href={`tel:${selectedGrievance.assignedWorker.phone}`} className="text-blue-600 font-semibold hover:underline">
+                              {selectedGrievance.assignedWorker.phone}
+                            </a>
+                          </div>
+                        )}
+                        {selectedGrievance.assignedWorker.email && (
+                          <div className="flex items-center gap-2">
+                            <svg className="h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+                              <polyline points="22,6 12,13 2,6"/>
+                            </svg>
+                            <span className="text-sm text-muted-foreground">{t({ en: 'Email:', mr: 'ईमेल:' })}</span>
+                            <a href={`mailto:${selectedGrievance.assignedWorker.email}`} className="text-blue-600 font-semibold hover:underline">
+                              {selectedGrievance.assignedWorker.email}
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
                 </div>

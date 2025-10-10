@@ -1,0 +1,7 @@
+houseNumber,ownerName,taxType,amountDue,dueDate,status
+H001,John Doe,Property Tax,5000,2024-12-31,Pending
+H002,Jane Smith,Water Tax,1200,2024-11-30,Pending
+H003,Bob Johnson,Garbage Tax,800,2024-10-31,Pending
+
+
+
