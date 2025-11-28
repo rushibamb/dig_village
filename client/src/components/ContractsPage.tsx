@@ -287,7 +287,7 @@ export function ContractsPage() {
                       setSelectedContract(tender);
                       setIsDetailOpen(true);
                     }}
-                    className="w-full bg-blue-900 hover:bg-blue-950 text-white"
+                    className="w-full bg-blue-900 bg-blue-950 text-black"
                   >
                     <Eye className="h-4 w-4 mr-2" />
                     {t({ en: 'View Details', mr: 'तपशील पहा' })}
@@ -392,7 +392,7 @@ export function ContractsPage() {
                           setSelectedContract(contract);
                           setIsProgressOpen(true);
                         }}
-                        className="bg-blue-900 hover:bg-blue-950 text-white"
+                        className="bg-blue-950 text-black"
                       >
                         <Eye className="h-4 w-4 mr-2" />
                         {t({ en: 'View Detail', mr: 'तपशील पहा' })}
@@ -487,7 +487,7 @@ export function ContractsPage() {
                       setSelectedContract(contract);
                       setIsReportOpen(true);
                     }}
-                    className="w-full bg-blue-900 hover:bg-blue-950 text-white"
+                    className="w-full bg-blue-900 hover:bg-blue-950 text-black"
                   >
                     <FileText className="h-4 w-4 mr-2" />
                     {t({ en: 'View Report', mr: 'अहवाल पहा' })}
@@ -963,7 +963,7 @@ export function ContractsPage() {
                   <div>
                     {selectedContract.completionReportUrl ? (
                       <Button 
-                        className="w-full bg-blue-900 hover:bg-blue-950 text-white"
+                        className="w-full bg-blue-900 bg-blue-950 text-black outline-black"
                         onClick={() => {
                           const link = document.createElement('a');
                           link.href = selectedContract.completionReportUrl;

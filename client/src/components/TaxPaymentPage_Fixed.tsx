@@ -244,7 +244,7 @@ export function TaxPaymentPage() {
                 className={`gap-2 transition-all duration-300 hover-scale ${
                   selectedTaxType === type.id 
                     ? `bg-gradient-to-r ${type.gradient} text-white shadow-lg animate-glow` 
-                    : 'text-gray-600 hover:bg-gradient-to-r hover:' + type.gradient + ' hover:text-white glass-effect'
+                    : 'text-gray-600 hover:bg-gradient-to-r hover:' + type.gradient + ' hover:text-black glass-effect'
                 } animate-slide-in-right`}
                 style={{ animationDelay: `${0.4 + index * 0.1}s` }}
               >

@@ -589,7 +589,7 @@ export function GrievancePage() {
                             variant="outline" 
                             size="sm"
                             onClick={() => handleViewDetails(grievance)}
-                            className="border-black text-black hover:bg-black hover:text-white"
+                            className="border-black text-black hover:bg-black hover:text-"black
                           >
                             {t({ en: 'View Details', mr: 'तपशील पहा' })}
                           </Button>
@@ -879,7 +879,7 @@ export function GrievancePage() {
             <Button
               variant="outline"
               onClick={() => setIsDetailModalOpen(false)}
-              className="border-black text-black hover:bg-black hover:text-white"
+              className="border-black text-black hover:bg-black hover:text-black"
             >
               {t({ en: 'Close', mr: 'बंद करा' })}
             </Button>
@@ -912,7 +912,7 @@ export function GrievancePage() {
             <Button
               variant="outline"
               onClick={() => setSelectedImage(null)}
-              className="border-black text-black hover:bg-black hover:text-white"
+              className="border-black text-black hover:bg-black hover:text-black"
             >
               {t({ en: 'Close', mr: 'बंद करा' })}
             </Button>

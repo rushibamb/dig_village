@@ -36,3 +36,10 @@ module.exports = mongoose.model('NewsCategory', newsCategorySchema);
 
 
 
+
+
+
+
+
+
+

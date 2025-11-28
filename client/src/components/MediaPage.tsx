@@ -253,7 +253,7 @@ export function MediaPage() {
             <Button
               variant={activeTab === 'photos' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('photos')}
-              className={`gap-2 ${activeTab === 'photos' ? 'bg-blue-900 hover:bg-blue-950 text-white' : 'text-gray-600'}`}
+              className={`hover:text-black gap-2 ${activeTab === 'photos' ? 'bg-blue-900 hover:bg-blue-950 text-black' : 'text-gray-600'}`}
             >
               <Camera className="h-4 w-4" />
               {t({ en: 'Photos', mr: 'फोटो' })} ({photos.length})
@@ -261,7 +261,7 @@ export function MediaPage() {
             <Button
               variant={activeTab === 'videos' ? 'default' : 'ghost'}
               onClick={() => setActiveTab('videos')}
-              className={`gap-2 ${activeTab === 'videos' ? 'bg-blue-900 hover:bg-blue-950 text-white' : 'text-gray-600'}`}
+              className={ ` hover:text-black gap-2 ${activeTab === 'videos' ? 'bg-blue-900 hover:bg-blue-950 text-black' : 'text-gray-600'}`}
             >
               <Video className="h-4 w-4" />
               {t({ en: 'Videos', mr: 'व्हिडिओ' })} ({videos.length})
@@ -278,7 +278,7 @@ export function MediaPage() {
                 variant={selectedCategory === 'all' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedCategory('all')}
-                className={selectedCategory === 'all' ? 'bg-blue-900 hover:bg-blue-950 text-white' : ''}
+                className={ selectedCategory === 'all' ? 'bg-blue-900 hover:bg-blue-950 text-black hover:text-black' : ''}
               >
                 {t({ en: 'All Media', mr: 'सर्व मीडिया' })}
               </Button>
@@ -286,14 +286,19 @@ export function MediaPage() {
               {/* Category Buttons */}
               {mediaCategories.map((category) => (
                 <Button
-                  key={category._id}
-                  variant={selectedCategory === category._id ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={() => setSelectedCategory(category._id)}
-                  className={selectedCategory === category._id ? 'bg-blue-900 hover:bg-blue-950 text-white' : ''}
-                >
-                  {t(category.name)} ({category.mediaCount || 0})
-                </Button>
+                key={category._id}
+                variant={selectedCategory === category._id ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setSelectedCategory(category._id)}
+                className={
+                  selectedCategory === category._id
+                    ? 'bg-blue-900 hover:bg-blue-800 text-white hover:text-white transition-colors duration-200'
+                    : 'hover:bg-blue-100 hover:text-blue-900 transition-colors duration-200'
+                }
+              >
+                {t(category.name)} ({category.mediaCount || 0})
+              </Button>
+              
               ))}
             </div>
             

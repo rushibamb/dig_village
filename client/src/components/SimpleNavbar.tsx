@@ -167,7 +167,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
         className={`navbar-button ${isMobile ? 'justify-start w-full' : ''} gap-2 relative overflow-hidden group transition-all duration-500 transform ${ 
           activePage === item.id 
             ? `bg-gradient-to-r ${item.gradient} text-white shadow-xl hover-lift animate-glow scale-105` 
-            : 'glass-effect border-0 hover:scale-105 hover:!bg-blue-500 hover:!bg-gradient-to-r hover:!from-blue-500 hover:!to-blue-600 hover:!text-white hover:shadow-lg'
+            : 'glass-effect border-0 hover:scale-105  hover:bg-blue-500 hover:bg-gradient-to-r hover:from-blue-500 hover:to-blue-600 hover:text-black hover:shadow-lg'
         }`}
         title={item.requiresAuth && !isLoggedIn ? t({ en: 'Login required', mr: 'लॉगिन आवश्यक' }) : undefined}
       >
@@ -243,7 +243,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
                   variant="outline"
                   size="sm"
                   onClick={handleLogout}
-                  className="gap-2 glass-effect border-red-200 text-red-600 hover:bg-gradient-to-r hover:from-red-500 hover:to-rose-600 hover:text-white hover:border-transparent transition-all duration-300 hover-scale transform hover:rotate-1"
+                  className="gap-2 glass-effect border-red-200 text-red-600 hover:bg-gradient-to-r hover:from-red-500 hover:to-rose-600 hover:text-black hover:border-transparent transition-all duration-300 hover-scale transform hover:rotate-1"
                   title={t({ en: 'Logout from your account', mr: 'आपल्या खात्यातून लॉगआउट करा' })}
                 >
                   <LogOut className="h-4 w-4" />
@@ -262,7 +262,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
                       navigate('/register');
                     }
                   }}
-                  className="gap-2 glass-effect border-green-200 text-green-600 hover:bg-gradient-to-r hover:from-green-500 hover:to-emerald-600 hover:text-white hover:border-transparent transition-all duration-300 hover-scale transform hover:rotate-1"
+                  className="gap-2 glass-effect border-green-200 text-green-600 hover:bg-gradient-to-r hover:from-green-500 hover:to-emerald-600 hover:text-black hover:border-transparent transition-all duration-300 hover-scale transform hover:rotate-1"
                   title={t({ en: 'Create a new account', mr: 'नवीन खाते तयार करा' })}
                 >
                   <User className="h-4 w-4" />
@@ -278,7 +278,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
                       navigate('/login');
                     }
                   }}
-                  className="gap-2 glass-effect border-blue-200 text-blue-600 hover:bg-gradient-to-r hover:from-blue-500 hover:to-indigo-600 hover:text-white hover:border-transparent transition-all duration-300 hover-scale transform hover:rotate-1"
+                  className="gap-2 glass-effect border-blue-200 text-blue-600 hover:bg-gradient-to-r hover:from-blue-500 hover:to-indigo-600 hover:text-black hover:border-transparent transition-all duration-300 hover-scale transform hover:rotate-1"
                   title={t({ en: 'Sign in to your account', mr: 'आपल्या खात्यात साइन इन करा' })}
                 >
                   <LogIn className="h-4 w-4" />
@@ -291,7 +291,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
               variant="outline"
               size="sm"
               onClick={toggleLanguage}
-              className="gap-2 glass-effect border-purple-200 text-purple-600 hover:bg-gradient-to-r hover:from-purple-500 hover:to-violet-600 hover:text-white hover:border-transparent transition-all duration-300 hover-scale transform hover:rotate-1"
+              className="gap-2 glass-effect border-purple-200 text-purple-600 hover:bg-gradient-to-r hover:from-purple-500 hover:to-violet-600 hover:text-black hover:border-transparent transition-all duration-300 hover-scale transform hover:rotate-1"
               title={t({ en: 'Switch language', mr: 'भाषा बदला' })}
             >
               <Languages className="h-4 w-4" />
@@ -341,7 +341,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
                         handleLogout();
                         setIsMobileMenuOpen(false);
                       }}
-                      className="w-full justify-start gap-3 glass-effect border-red-200 text-red-600 hover:bg-gradient-to-r hover:from-red-500 hover:to-rose-600 hover:text-white hover:border-transparent transition-all duration-300"
+                      className="w-full justify-start gap-3 glass-effect border-red-200 text-red-600 hover:bg-gradient-to-r hover:from-red-500 hover:to-rose-600 hover:text-black hover:border-transparent transition-all duration-300"
                     >
                       <LogOut className="h-4 w-4" />
                       {t({ en: 'Logout', mr: 'लॉगआउट' })}
@@ -374,7 +374,7 @@ export function SimpleNavbar({ currentPage, onPageChange }: SimpleNavbarProps) {
                         }
                         setIsMobileMenuOpen(false);
                       }}
-                      className="w-full justify-start gap-3 glass-effect border-blue-200 text-blue-600 hover:bg-gradient-to-r hover:from-blue-500 hover:to-indigo-600 hover:text-white hover:border-transparent transition-all duration-300"
+                      className="w-full justify-start gap-3 glass-effect border-blue-200 text-blue-600 hover:bg-gradient-to-r hover:from-blue-500 hover:to-indigo-600 hover:text-black hover:border-transparent transition-all duration-300"
                     >
                       <LogIn className="h-4 w-4" />
                       {t({ en: 'Login', mr: 'लॉगिन' })}

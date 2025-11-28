@@ -206,7 +206,7 @@ export function NewsPage() {
                 variant={selectedCategory === 'all' ? 'default' : 'outline'}
                 size="sm"
                 onClick={() => setSelectedCategory('all')}
-                className={`gap-1 text-xs ${selectedCategory === 'all' ? 'bg-indigo-600 text-white' : ''}`}
+                className={`hover:text-black gap-1 text-xs ${selectedCategory === 'all' ? 'bg-indigo-600 text-white ' : ''}`}
               >
                 <Newspaper className="h-3 w-3" />
                 {t({ en: 'All News', mr: 'सर्व बातम्या' })}
@@ -219,7 +219,7 @@ export function NewsPage() {
                   variant={selectedCategory === category._id ? 'default' : 'outline'}
                   size="sm"
                   onClick={() => setSelectedCategory(category._id)}
-                  className={`gap-1 text-xs ${selectedCategory === category._id ? 'bg-indigo-600 text-white' : ''}`}
+                  className={` hover:text-black gap-1 text-xs ${selectedCategory === category._id ? 'bg-indigo-600 text-white' : ''}`}
                 >
                   <Newspaper className="h-3 w-3" />
                   {category?.name ? t(category.name) : 'Category'}

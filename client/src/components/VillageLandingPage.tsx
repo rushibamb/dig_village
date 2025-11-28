@@ -310,17 +310,17 @@ export function VillageLandingPage() {
               
               return (
                 <Card key={facility._id || index} 
-                      className={`text-center border-0 shadow-xl hover-lift glass-effect group animate-scale-in hover-tilt`}
-                      style={{ animationDelay: delay }}>
-                  <CardContent className="pt-8 pb-6 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50"></div>
-                    <div className={`w-18 h-18 bg-gradient-to-br ${gradient} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 animate-float relative z-10`}>
-                      <IconComponent className="h-9 w-9 text-white" />
-                    </div>
-                    <h3 className="font-bold text-lg mb-3 relative z-10">{t(facility.name) || t({ en: 'Facility', mr: 'सुविधा' })}</h3>
-                    <p className="text-gray-600 text-sm relative z-10">{t(facility.description) || t({ en: 'Description', mr: 'वर्णन' })}</p>
-                  </CardContent>
-                </Card>
+                className={`text-center border-0 shadow-xl hover-lift glass-effect group animate-scale-in hover-tilt`}
+                style={{ animationDelay: delay }}>
+            <CardContent className="pt-8 pb-6 relative overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50"></div>
+              <div className={`bg-indigo-600 w-18 h-18 bg-gradient-to-br ${gradient} rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl group-hover:scale-110 group-hover:rotate-12 transition-all duration-500 animate-float relative z-10 `}>
+                <IconComponent className="h-9 w-9 text-white" />
+              </div>
+              <h3 className="font-bold text-lg mb-3 relative z-10">{t(facility.name) || t({ en: 'Facility', mr: 'सुविधा' })}</h3>
+              <p className="text-gray-600 text-sm relative z-10">{t(facility.description) || t({ en: 'Description', mr: 'वर्णन' })}</p>
+            </CardContent>
+          </Card>
               );
             })}
           </div>
@@ -363,7 +363,7 @@ export function VillageLandingPage() {
                   </div>
                   <CardContent className="p-6 relative">
                     <div className="flex items-center justify-between mb-4">
-                      <Badge className={`bg-gradient-to-r ${gradient} text-white border-0 px-3 py-1 shadow-lg`}>
+                      <Badge className={`bg-gradient-to-r bg-indigo-600 ${gradient} text-white border-0 px-3 py-1 shadow-lg`}>
                         {t(development.category) || t({ en: 'Development', mr: 'विकास' })}
                       </Badge>
                       <span className="text-sm text-gray-500 font-medium">{date}</span>
@@ -412,7 +412,7 @@ export function VillageLandingPage() {
                       <p className="text-lg mb-6 text-gray-700 leading-relaxed">
                         {t(achievements[0].description) || t({ en: 'Outstanding achievement', mr: 'उत्कृष्ट उपलब्धी' })}
                       </p>
-                      <Badge className="bg-gradient-to-r from-blue-500 to-blue-700 text-white text-base px-6 py-2 shadow-lg">
+                      <Badge className="bg-indigo-600 text-white text-base px-6 py-2 shadow-lg">
                         {t({ en: 'State Level Recognition', mr: 'राज्यस्तरीय मान्यता' })}
                       </Badge>
                     </div>

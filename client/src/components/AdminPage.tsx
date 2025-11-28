@@ -266,10 +266,10 @@ const TaxRecordForm = ({ record, onSubmit, onCancel }) => {
       </div>
 
       <DialogFooter>
-        <Button type="button" className="bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white shadow-md hover:shadow-lg transition-all duration-300" onClick={onCancel}>
+        <Button type="button" variant="neutral" onClick={onCancel}>
           {t({ en: 'Cancel', mr: 'रद्द करा' })}
         </Button>
-        <Button type="submit" className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-black shadow-md hover:shadow-lg transition-all duration-300">
+        <Button type="submit" variant="success" className='bg-indigo-600 hover:bg-indigo-700'>
           {record ? t({ en: 'Update Record', mr: 'रेकॉर्ड अपडेट करा' }) : t({ en: 'Create Record', mr: 'रेकॉर्ड तयार करा' })}
         </Button>
       </DialogFooter>
@@ -4228,10 +4228,10 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
           )}
 
           <div className="flex justify-end gap-2 pt-4">
-                    <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+                    <Button type="button" variant="neutral" onClick={() => setIsModalOpen(false)}>
               {t({ en: 'Cancel', mr: 'रद्द करा' })}
             </Button>
-                    <Button type="submit">
+                    <Button type="submit" variant="success" className='bg-indigo-600 hover:bg-indigo-700'>
               <Save className="h-4 w-4 mr-2" />
                       {editingVillager._id ? 
                         t({ en: 'Update', mr: 'अद्ययावत करा' }) : 
@@ -4336,7 +4336,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                           >
                             {isUploadingHero ? (
                               <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
+                                <div className="bg-indigo-600 animate-spin rounded-full h-4 w-4 border-b-2 border-gray-900 mr-2"></div>
                                 {t({ en: 'Uploading...', mr: 'अपलोड होत आहे...' })}
                               </>
                             ) : (
@@ -4769,9 +4769,13 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                   </div>
 
                   <div className="flex justify-end">
-                    <Button onClick={handleSaveSiteSettings} className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-indigo-700 hover:to-indigo-800 text-black shadow-lg hover:shadow-xl transition-all duration-300">
-                      {t({ en: 'Save Settings', mr: 'सेटिंग्ज सेव्ह करा' })}
-                    </Button>
+                  <Button
+onClick={handleSaveSiteSettings}
+  className="bg-indigo-600 text-white shadow-md hover:scale-105 transition-transform duration-300"
+>
+  {t({ en: 'Save Settings', mr: 'सेटिंग्ज सेव्ह करा' })}
+</Button>
+
                   </div>
                 </CardContent>
               </Card>
@@ -4781,7 +4785,7 @@ H-002,Jane Smith,Water Tax,1200,2024-03-31`;
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <CardTitle>{t({ en: 'Manage Latest Developments', mr: 'अलीकडील विकास व्यवस्थापित करा' })}</CardTitle>
-black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(true)} className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text- shadow-lg hover:shadow-xl transition-all duration-300">
+                  <Button onClick={() => setIsAddLatestDevelopmentOpen(true)} className=" bg-indigo-600 text-white shadow-md hover:scale-105 transition-transform duration-300">
                       <Plus className="h-4 w-4 mr-2" />
                       {t({ en: 'Add Latest Development', mr: 'अलीकडील विकास जोडा' })}
                     </Button>
@@ -4865,7 +4869,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                 <CardHeader>
                   <div className="flex justify-between items-center">
                     <CardTitle>{t({ en: 'Manage Facilities', mr: 'सुविधा व्यवस्थापित करा' })}</CardTitle>
-                    <Button onClick={() => setIsAddFacilityOpen(true)} className="bg-indigo-600 hover:bg-indigo-700">
+                    <Button onClick={() => setIsAddFacilityOpen(true)} className="bg-indigo-600 ">
                       <Plus className="h-4 w-4 mr-2" />
                       {t({ en: 'Add Facility', mr: 'सुविधा जोडा' })}
                     </Button>
@@ -4984,20 +4988,20 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
               <div className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   variant="outline" 
-                  className="flex items-center gap-2"
+                  className="flex items-center gap-2 bg-indigo-600 text-white"
                   onClick={() => setIsUploadModalOpen(true)}
                 >
                   <Upload className="h-4 w-4" />
                   {t({ en: 'Upload Tax Records', mr: 'कर रेकॉर्ड अपलोड करा' })}
                 </Button>
                 <Button 
-                  className="flex items-center gap-2 text-color-black"
+                  className="flex items-center gap-2 text-color-black bg-indigo-600 text-white"
                   onClick={() => {
                     setEditingTaxRecord(null);
                     setIsTaxModalOpen(true);
                   }}
                 >
-                  <Plus className="h-4 w-4" />
+                  <Plus className="h-4 w-4 bg-indigo-600 text-white " />
                   {t({ en: 'Add New Record', mr: 'नवीन रेकॉर्ड जोडा' })}
                 </Button>
               </div>
@@ -5204,7 +5208,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                     </Button>
                     <div className="flex gap-2">
                       <Button
-                        variant="outline"
+                        variant="neutral"
                         onClick={() => {
                           setIsUploadModalOpen(false);
                           setSelectedFile(null);
@@ -5212,11 +5216,12 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                       >
                         {t({ en: 'Cancel', mr: 'रद्द करा' })}
                       </Button>
-                      <Button
+                      <Button className="bg-indigo-600 text-white"
                         onClick={handleUploadSubmit}
-                        disabled={!selectedFile} className="text-color-black"
+                        disabled={!selectedFile}
+                        variant="info"
                       >
-                        <Upload className="h-4 w-4 mr-2" />
+                        <Upload className="h-4 w-4 mr-2 bg-indigo-600 text-white" />
                         {t({ en: 'Upload', mr: 'अपलोड करा' })}
                       </Button>
                     </div>
@@ -5291,7 +5296,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
               <div className="flex justify-end mb-4">
                 <Dialog open={isWorkerModalOpen} onOpenChange={setIsWorkerModalOpen}>
                   <DialogTrigger asChild>
-                    <Button onClick={handleOpenWorkerModal} className="bg-gray-800 hover:bg-gray-900 text-white">
+                    <Button onClick={handleOpenWorkerModal} className="bg-gray-800 hover:bg-gray-900 text-white bg-indigo-600 text-white">
                       <Plus className="h-4 w-4 mr-2" />
                       {t({ en: 'Manage Workers', mr: 'कामगार व्यवस्थापन' })}
                     </Button>
@@ -6108,7 +6113,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                   <div className="flex gap-3">
                     <Button 
                       onClick={() => setIsAddCommitteeMemberOpen(true)} 
-                      className="bg-teal-600 hover:bg-teal-700 text-blue
+                      className="bg-teal-600 hover:bg-teal-700 text-blue bg-indigo-600 text-white
                        px-6 py-3 text-sm font-medium shadow-md hover:shadow-lg transition-all duration-200"
                     >
                       <Plus className="h-4 w-4 mr-2" />
@@ -6116,7 +6121,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                     </Button>
                     <Button 
                       variant="outline" 
-                      className="bg-teal-600 hover:bg-teal-700 text-black
+                      className="bg-teal-600 hover:bg-teal-700 text-black bg-indigo-600 text-white
                        px-6 py-3 text-sm font-medium shadow-md hover:shadow-lg transition-all duration-200"
                       onClick={handleExportMembersCsv}
                     >
@@ -9056,7 +9061,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
                 </div>
                 
                 <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsEditNewsOpen(false)}>
+                  <Button variant="outline" onClick={() => setIsEditNewsOpen(false)} className="bg-indigo-600 hover:bg-indigo-700">
                     {t({ en: 'Cancel', mr: 'रद्द करा' })}
                   </Button>
                   <Button onClick={handleUpdateNews} className="bg-indigo-600 hover:bg-indigo-700">
@@ -11055,7 +11060,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
               <Button variant="outline" onClick={() => setIsAddLatestDevelopmentOpen(false)}>
                 {t({ en: 'Cancel', mr: 'रद्द करा' })}
               </Button>
-              <Button onClick={handleAddLatestDevelopment}>
+              <Button onClick={handleAddLatestDevelopment} className='bg-indigo-600 hover:bg-indigo-700'>
                 {t({ en: 'Add Development', mr: 'विकास जोडा' })}
               </Button>
             </DialogFooter>
@@ -11338,7 +11343,7 @@ black                    <Button onClick={() => setIsAddLatestDevelopmentOpen(tr
               <Button variant="outline" onClick={() => setIsAddFacilityOpen(false)}>
                 {t({ en: 'Cancel', mr: 'रद्द करा' })}
               </Button>
-              <Button onClick={handleAddFacility}>
+              <Button onClick={handleAddFacility} className='bg-indigo-600 hover:bg-indigo-700'>
                 {t({ en: 'Add Facility', mr: 'सुविधा जोडा' })}
               </Button>
             </DialogFooter>

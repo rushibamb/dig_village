@@ -406,7 +406,7 @@ export function TaxPaymentPage() {
                 className={`gap-2 transition-all duration-300 hover-scale ${
                   selectedTaxType === type.id 
                     ? `bg-gradient-to-r ${type.gradient} text-white shadow-lg animate-glow` 
-                    : 'text-gray-600 hover:bg-gradient-to-r hover:' + type.gradient + ' hover:text-white glass-effect'
+                    : 'text-gray-600 hover:bg-gradient-to-r hover:' + type.gradient + ' hover:text-black glass-effect'
                 } animate-slide-in-right`}
                 style={{ animationDelay: `${0.4 + index * 0.1}s` }}
               >
@@ -611,7 +611,7 @@ export function TaxPaymentPage() {
                                 <Button
                                   onClick={() => handleDownloadReceipt(record.id)}
                                   variant="outline"
-                                  className="border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-white transition-all duration-300"
+                                  className="border-blue-500 text-blue-600 hover:bg-blue-500 hover:text-black transition-all duration-300"
                                 >
                                   <Download className="h-4 w-4 mr-2" />
                                   {t({ en: 'Download Receipt', mr: 'रसीद डाउनलोड करा' })}

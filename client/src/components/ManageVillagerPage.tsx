@@ -737,7 +737,7 @@ export function ManageVillagerPage() {
                         variant="outline"
                         onClick={() => document.getElementById('idProof')?.click()}
                         disabled={isUploadingImage}
-                        className="glass-effect border-villager/20 hover:bg-villager hover:text-white transition-all duration-300 hover-scale"
+                        className="glass-effect border-villager/20 hover:bg-villager hover:text-black transition-all duration-300 hover-scale"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         {isUploadingImage ? t({ en: 'Uploading...', mr: 'अपलोड करत आहे...' }) : t({ en: 'Upload Photo', mr: 'फोटो अपलोड करा' })}
@@ -1025,7 +1025,7 @@ export function ManageVillagerPage() {
                         variant="outline"
                         onClick={() => document.getElementById('editIdProof')?.click()}
                         disabled={isUploadingImage}
-                        className="glass-effect border-orange-500/20 hover:bg-orange-500 hover:text-white transition-all duration-300 hover-scale"
+                        className="glass-effect border-orange-500/20 hover:bg-orange-500 hover:text-black transition-all duration-300 hover-scale"
                       >
                         <Upload className="h-4 w-4 mr-2" />
                         {isUploadingImage ? t({ en: 'Uploading...', mr: 'अपलोड करत आहे...' }) : t({ en: 'Upload Photo', mr: 'फोटो अपलोड करा' })}
