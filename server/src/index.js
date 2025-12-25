@@ -70,12 +70,18 @@ const createDefaultAdmin = async () => {
 // Initialize Express app
 const app = express();
 
-// --- UPDATED: CORS Middleware ---
+// --- CORS Middleware - MUST be before all routes ---
 // This allows your specific Vercel frontend to talk to this backend
 app.use(cors({
-  origin: ["https://dig-village-rushikesh-bambs-projects.vercel.app", "http://localhost:3000"],
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
+  origin: [
+    "https://dig-village.vercel.app",
+    "https://dig-village-rushikesh-bambs-projects.vercel.app",
+    "http://localhost:3000",
+    "http://localhost:5173" // Vite default dev port
+  ],
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"]
 }));
 
 app.use(express.json({ limit: '50mb', extended: true }));

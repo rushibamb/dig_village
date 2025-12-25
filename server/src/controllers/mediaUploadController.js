@@ -11,9 +11,10 @@ if (cloudinaryConfigured) {
   cloudinary.config({
     cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
     api_key: process.env.CLOUDINARY_API_KEY,
-    api_secret: process.env.CLOUDINARY_API_SECRET
+    api_secret: process.env.CLOUDINARY_API_SECRET,
+    secure: true // Force HTTPS URLs for all Cloudinary resources
   });
-  console.log('✅ Cloudinary configured successfully');
+  console.log('✅ Cloudinary configured successfully with secure HTTPS');
 } else {
   console.warn('⚠️ Cloudinary not configured. Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, and CLOUDINARY_API_SECRET environment variables.');
 }
