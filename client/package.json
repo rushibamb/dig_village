@@ -57,9 +57,9 @@
             "typescript": "^5.9.3",
             "vite": "^6.3.5"
       },
-      "scripts": {
-            "dev": "vite",
-            "build": "npx vite build",
-            "preview": "vite preview"
-      }
+    "scripts": {
+  "dev": "vite",
+  "build": "npx vite build", 
+  "preview": "vite preview"
+}
 }
