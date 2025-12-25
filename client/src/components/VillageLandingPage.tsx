@@ -56,9 +56,27 @@ export function VillageLandingPage() {
 
         // Update state with fetched data
         setHomeContent(siteSettings.data || siteSettings);
-        setFacilities(facilitiesData.data || facilitiesData || []);
-        setAchievements(achievementsData.data || achievementsData || []);
-        setLatestDevelopments(latestDevelopmentsData.data || latestDevelopmentsData || []);
+        // Ensure facilities is always an array
+        const facilitiesArray = Array.isArray(facilitiesData?.data) 
+          ? facilitiesData.data 
+          : Array.isArray(facilitiesData) 
+          ? facilitiesData 
+          : [];
+        setFacilities(facilitiesArray);
+        // Ensure achievements is always an array
+        const achievementsArray = Array.isArray(achievementsData?.data) 
+          ? achievementsData.data 
+          : Array.isArray(achievementsData) 
+          ? achievementsData 
+          : [];
+        setAchievements(achievementsArray);
+        // Ensure latestDevelopments is always an array
+        const latestDevelopmentsArray = Array.isArray(latestDevelopmentsData?.data) 
+          ? latestDevelopmentsData.data 
+          : Array.isArray(latestDevelopmentsData) 
+          ? latestDevelopmentsData 
+          : [];
+        setLatestDevelopments(latestDevelopmentsArray);
         setContactInfo(officeInfo.data || officeInfo);
         setVillagerStats(villagerStatsData.data || villagerStatsData);
       } catch (error) {
@@ -303,7 +321,7 @@ export function VillageLandingPage() {
           </div>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {facilities.map((facility, index) => {
+            {Array.isArray(facilities) && facilities.map((facility, index) => {
               const IconComponent = iconMap[facility.icon] || Heart;
               const gradient = gradients[index % gradients.length];
               const delay = `${0.1 + (index * 0.1)}s`;
@@ -340,7 +358,7 @@ export function VillageLandingPage() {
           </div>
           
           <div className="grid md:grid-cols-3 gap-8">
-            {latestDevelopments.map((development, index) => {
+            {Array.isArray(latestDevelopments) && latestDevelopments.map((development, index) => {
               const gradient = gradients[index % gradients.length];
               const date = new Date(development.publishDate).toLocaleDateString('en-GB', {
                 day: '2-digit',
@@ -424,7 +442,7 @@ export function VillageLandingPage() {
 
           {/* Achievement Grid */}
           <div className="grid md:grid-cols-3 gap-8">
-            {achievements.slice(1).map((achievement, index) => {
+            {Array.isArray(achievements) && achievements.slice(1).map((achievement, index) => {
               const gradient = gradients[index % gradients.length];
               return (
                 <Card key={achievement._id || index} 

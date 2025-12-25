@@ -7,7 +7,7 @@ import { Input } from './ui/input';
 import { Textarea } from './ui/textarea';
 import { useLanguage } from './LanguageProvider';
 import { useAuth } from './AuthContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { FileText, Plus, MessageCircle, Clock, CheckCircle, AlertTriangle, Camera, User } from 'lucide-react';
 import { getMyGrievances, submitGrievance, getGrievanceStats } from '../services/grievanceService';
 import { ImageWithFallback } from './figma/ImageWithFallback';

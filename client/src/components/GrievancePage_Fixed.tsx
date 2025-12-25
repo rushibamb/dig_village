@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { useLanguage } from './LanguageProvider';
 import { useAuth } from './AuthContext';
-import { toast } from 'sonner@2.0.3';
+import { toast } from 'sonner';
 import { FileText, Plus, MessageCircle, Clock, CheckCircle, AlertTriangle, Camera, User } from 'lucide-react';
 
 export function GrievancePage() {
