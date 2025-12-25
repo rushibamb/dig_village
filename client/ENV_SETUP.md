@@ -23,8 +23,9 @@ VITE_API_URL=https://dig-village.onrender.com
 
 3. **For Local Development**:
    - Create a `.env` file in the `client/` directory
-   - Set `VITE_API_URL=http://localhost:5000` for local development
-   - Or leave it unset and the app will attempt to use relative URLs (which will fail if backend is on different port)
+   - Set `VITE_API_URL=http://localhost:5000` for local development (if backend runs on port 5000)
+   - Or leave it unset and the app will use relative URLs `/api` (works if frontend and backend are on same origin)
+   - **Note**: If your backend runs on a different port, you MUST set `VITE_API_URL` to the full backend URL
 
 ## Verification
 

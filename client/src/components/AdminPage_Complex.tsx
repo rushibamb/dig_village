@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import api from '../api/axios';
 import { adminGetAllMediaItems, adminGetAllMediaCategories, adminCreateMediaItem, adminUpdateMediaItem, adminDeleteMediaItem, adminCreateMediaCategory, adminDeleteMediaCategory } from '../services/mediaService';
 import { 
   adminGetAllFacilities, 
@@ -985,20 +986,14 @@ function AdminPage() {
       const formData = new FormData();
       formData.append('file', file);
       
-      // Upload to server endpoint
-      const response = await fetch('/api/upload/upload', {
-        method: 'POST',
+      // Upload to server endpoint using axios instance
+      const response = await api.post('/upload/upload', formData, {
         headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
+          'Content-Type': 'multipart/form-data',
         },
-        body: formData
       });
       
-      if (!response.ok) {
-        throw new Error('Upload failed');
-      }
-      
-      const result = await response.json();
+      const result = response.data;
       
       if (result.success) {
         setNewMediaItem(prev => ({
