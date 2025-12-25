@@ -73,7 +73,7 @@ const app = express();
 // --- UPDATED: CORS Middleware ---
 // This allows your specific Vercel frontend to talk to this backend
 app.use(cors({
-  origin: ["https://dig-village.vercel.app", "http://localhost:3000"],
+  origin: ["https://dig-village-rushikesh-bambs-projects.vercel.app", "http://localhost:3000"],
   methods: ["GET", "POST", "PUT", "DELETE"],
   credentials: true
 }));
