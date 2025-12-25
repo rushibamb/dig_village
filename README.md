@@ -69,6 +69,11 @@ ty_pro/
 
 4. **Configure environment variables**
 
+   Create a `.env` file in the `client/` directory:
+   ```env
+   VITE_API_BASE_URL=http://localhost:5000
+   ```
+
    Create a `.env` file in the `server/` directory:
    ```env
    PORT=5000

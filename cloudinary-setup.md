@@ -32,7 +32,7 @@
 5. **Save Settings**
 
 ### **Step 3: Update Environment Variables**
-Create `client/.env.local`:
+Create `client/.env`:
 ```env
 VITE_CLOUDINARY_CLOUD_NAME=your-actual-cloud-name
 VITE_CLOUDINARY_UPLOAD_PRESET_SUBMISSION=grievance_submission
