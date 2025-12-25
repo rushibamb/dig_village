@@ -5302,69 +5302,81 @@ onClick={handleSaveSiteSettings}
                     </Button>
                   </DialogTrigger>
 
-                  <DialogContent className="max-w-4xl">
-                    <DialogHeader>
+                  <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+                    <DialogHeader className="flex-shrink-0 pb-4 border-b">
                       <DialogTitle className="text-2xl font-bold">
                         {t({ en: 'Worker Management', mr: 'कामगार व्यवस्थापन' })}
                       </DialogTitle>
                     </DialogHeader>
                     
-                    <div className="space-y-6">
+                    <div className="flex-1 overflow-y-auto pr-2 space-y-6 mt-4">
                       {/* Current Workers List */}
                       <div>
                         <h3 className="text-lg font-semibold mb-4">
                           {t({ en: 'Current Workers', mr: 'वर्तमान कामगार' })}
-              </h3>
-                        <div className="grid gap-4">
-                          {workers.map((worker) => (
-                            <div key={worker._id} className="border rounded-lg p-4">
-                              <div className="flex justify-between items-center">
-                                <div>
-                                  <h4 className="font-semibold">{worker.name}</h4>
-                                  <p className="text-sm text-gray-600">{worker.department}</p>
-                                  <div className="flex gap-4 mt-1 text-sm">
-                                    {worker.phone && <span>📞 {worker.phone}</span>}
-                                    {worker.email && <span>📧 {worker.email}</span>}
-                                    <span className={
-                                      worker.status === 'active' 
-                                        ? 'text-green-600 font-medium' 
-                                        : 'text-gray-500'
-                                    }>
-                                      {worker.status === 'active' ? '🟢 Active' : '🔴 Inactive'}
-                                    </span>
+                        </h3>
+                        <div className="border rounded-lg p-4 max-h-[300px] overflow-y-auto bg-gray-50">
+                          <div className="space-y-3">
+                            {workers.map((worker) => (
+                              <div key={worker._id} className="border rounded-lg p-4 bg-white shadow-sm hover:shadow-md transition-shadow">
+                                <div className="flex justify-between items-center gap-4">
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="font-semibold text-base mb-1">{worker.name}</h4>
+                                    <p className="text-sm text-gray-600 mb-2">{worker.department}</p>
+                                    <div className="flex flex-wrap gap-3 text-sm">
+                                      {worker.phone && (
+                                        <span className="flex items-center gap-1">
+                                          <span>📞</span>
+                                          <span className="text-gray-700">{worker.phone}</span>
+                                        </span>
+                                      )}
+                                      {worker.email && (
+                                        <span className="flex items-center gap-1">
+                                          <span>📧</span>
+                                          <span className="text-gray-700 truncate">{worker.email}</span>
+                                        </span>
+                                      )}
+                                      <span className={
+                                        worker.status === 'active' 
+                                          ? 'text-green-600 font-medium' 
+                                          : 'text-gray-500'
+                                      }>
+                                        {worker.status === 'active' ? '🟢 Active' : '🔴 Inactive'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2 flex-shrink-0">
+                                    <Button 
+                                      size="sm" 
+                                      className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
+                                      onClick={() => handleEditWorkerClick(worker)}
+                                    >
+                                      <Edit className="h-4 w-4 mr-1" />
+                                      {t({ en: 'Edit', mr: 'सुधारा' })}
+                                    </Button>
+                                    <Button 
+                                      size="sm" 
+                                      className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
+                                      onClick={() => handleDeleteWorker(worker._id)}
+                                    >
+                                      <Trash2 className="h-4 w-4 mr-1" />
+                                      {t({ en: 'Delete', mr: 'हटवा' })}
+                                    </Button>
                                   </div>
                                 </div>
-                                <div className="flex gap-2">
-                                  <Button 
-                                    size="sm" 
-                                    className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
-                                    onClick={() => handleEditWorkerClick(worker)}
-                                  >
-                                    <Edit className="h-4 w-4 mr-1" />
-                                    {t({ en: 'Edit', mr: 'सुधारा' })}
-                                  </Button>
-                                  <Button 
-                                    size="sm" 
-                                    className="bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white shadow-md hover:shadow-lg transition-all duration-300"
-                                    onClick={() => handleDeleteWorker(worker._id)}
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-1" />
-                                    {t({ en: 'Delete', mr: 'हटवा' })}
-                                  </Button>
-                                </div>
                               </div>
-                            </div>
-                          ))}
-                          {workers.length === 0 && (
-                            <div className="text-center py-8 text-gray-500">
-                              {t({ en: 'No workers found', mr: 'कोणत्याही कामगारांचा दिसत नाही' })}
-                            </div>
-                          )}
+                            ))}
+                            {workers.length === 0 && (
+                              <div className="text-center py-8 text-gray-500">
+                                {t({ en: 'No workers found', mr: 'कोणत्याही कामगारांचा दिसत नाही' })}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </div>
 
                       {/* Worker Form */}
-                      <div>
+                      <div className="border-t pt-6">
                         <h3 className="text-lg font-semibold mb-4">
                           {editingWorker 
                             ? t({ en: 'Edit Worker', mr: 'कामगार सुधारा' })
@@ -5437,10 +5449,10 @@ onClick={handleSaveSiteSettings}
                             </div>
                           </div>
                           
-                          <div className="flex gap-3 pt-4">
+                          <div className="flex gap-3 pt-4 pb-2">
                             <Button 
                               type="submit" 
-                              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-black flex-1 shadow-lg hover:shadow-xl transition-all duration-300"
+                              className=" bg-indigo-600 hover:bg-indigo-700 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white flex-1 shadow-lg hover:shadow-xl transition-all duration-300"
                             >
                               {editingWorker 
                                 ? t({ en: 'Update Worker', mr: 'कामगार अद्यतनित करा' })
